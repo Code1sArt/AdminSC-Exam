@@ -98,12 +98,13 @@ button:disabled {
 .brand-mark {
   width: 43px;
   height: 43px;
-  display: grid;
-  place-items: center;
-  border-radius: 13px;
-  color: white;
-  background: linear-gradient(140deg, #7669f0, #4a3bcc);
-  box-shadow: 0 8px 18px rgba(101, 88, 232, 0.25);
+  flex: none;
+  background: url("/lab-edu-logo.png") center / contain no-repeat;
+}
+.app-loader-logo {
+  width: 54px;
+  height: 54px;
+  background: url("/lab-edu-logo.png") center / contain no-repeat;
 }
 .brand strong,
 .login-brand strong {
@@ -2621,9 +2622,12 @@ td span {
   z-index: 2;
 }
 .login-brand .brand-mark {
-  background: rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.14);
+  background-size: 33px;
   box-shadow: none;
   border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 13px;
+  padding: 5px;
 }
 .login-brand span {
   color: #cbc5ef;

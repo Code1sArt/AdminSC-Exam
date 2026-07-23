@@ -2205,7 +2205,7 @@ export function AdminApp() {
   if (!hydrated)
     return (
       <div className="app-loader">
-        <BrainCircuit size={34} />
+        <div className="app-loader-logo" aria-hidden="true" />
         <span>กำลังเตรียมระบบ...</span>
       </div>
     );
@@ -2228,9 +2228,7 @@ export function AdminApp() {
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">
-            <BrainCircuit size={25} />
-          </div>
+          <div className="brand-mark" aria-hidden="true" />
           <div>
             <strong>Lab EDU</strong>
             <span>AI Assessment</span>
@@ -2584,9 +2582,7 @@ function LoginScreen({
     <main className="login-page">
       <section className="login-visual">
         <div className="login-brand">
-          <div className="brand-mark">
-            <BrainCircuit size={28} />
-          </div>
+          <div className="brand-mark" aria-hidden="true" />
           <div>
             <strong>Lab EDU</strong>
             <span>AI Assessment Platform</span>
@@ -2629,9 +2625,7 @@ function LoginScreen({
       <section className="login-panel">
         <form className="login-form" onSubmit={onSubmit}>
           <div className="mobile-login-brand">
-            <div className="brand-mark">
-              <BrainCircuit />
-            </div>
+            <div className="brand-mark" aria-hidden="true" />
             <strong>Lab EDU</strong>
           </div>
           <span className="login-kicker">LAB EDU PORTAL</span>

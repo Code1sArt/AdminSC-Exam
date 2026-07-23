@@ -15,7 +15,11 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: "Lab EDU — ผู้ดูแลระบบ",
     description: "พื้นที่บริหารจัดการการเรียนรู้ การวัดผล และการวิเคราะห์ด้วย AI",
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    icons: {
+      icon: "/favicon.png",
+      shortcut: "/favicon.png",
+      apple: "/apple-touch-icon.png",
+    },
     openGraph: {
       title: "Lab EDU — AI Assessment Platform",
       description: "วัดผลอย่างเข้าใจผู้เรียนด้วยระบบข้อสอบและการวิเคราะห์ด้วย AI",
