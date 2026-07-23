@@ -17,7 +17,7 @@ env:
   NODE_VERSION: "22"
   PLESK_HOST: "118.27.146.122"
   PLESK_USER: "admin_lebedu"
-  PLESK_DEPLOY_PATH: "/var/www/vhosts/labedu.tech/httpdocs/admin.labedu.tech"
+  PLESK_DEPLOY_PATH: "/var/www/vhosts/labedu.tech/admin.labedu.tech"
   PLESK_SSH_PORT: ${{ vars.PLESK_SSH_PORT || '22' }}
   PRODUCTION_URL: "https://admin.labedu.tech"
 

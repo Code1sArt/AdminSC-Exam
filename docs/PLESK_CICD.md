@@ -3,7 +3,7 @@
 โปรเจกต์นี้ build เป็น Vinext standalone Node.js bundle แล้ว deploy ไปยัง:
 
 ```text
-/var/www/vhosts/labedu.tech/httpdocs/admin.labedu.tech
+/var/www/vhosts/labedu.tech/admin.labedu.tech
 ```
 
 ทุกครั้งที่ push เข้า branch `main` workflow จะ lint, test, build, rsync ไฟล์ขึ้น
@@ -15,10 +15,10 @@ Plesk และ restart แอปผ่าน Passenger โดยอัตโน
 
 | รายการ | ค่า |
 | --- | --- |
-| Node.js version | `22.x` |
+| Node.js version | `24.x` |
 | Application mode | `Production` |
-| Application root | `httpdocs/admin.labedu.tech` |
-| Document root | `httpdocs/admin.labedu.tech/dist/client` |
+| Application root | `admin.labedu.tech` |
+| Document root | `admin.labedu.tech/dist/client` |
 | Application startup file | `server.js` |
 
 ยังไม่ต้องกด Enable จนกว่า workflow จะ deploy ครั้งแรก เพราะ `server.js` จะถูกสร้าง
@@ -49,7 +49,7 @@ ssh-copy-id -i ./admin_sc_exam_plesk.pub admin_lebedu@118.27.146.122
 
 ```bash
 ssh -i ./admin_sc_exam_plesk admin_lebedu@118.27.146.122 \
-  "test -w /var/www/vhosts/labedu.tech/httpdocs/admin.labedu.tech"
+  "test -w /var/www/vhosts/labedu.tech/admin.labedu.tech"
 ```
 
 ## 3. เพิ่ม GitHub Secrets
@@ -89,7 +89,7 @@ push โค้ดขึ้น `main` หรือไปที่
 การ deploy ครั้งต่อไปจะ restart แอปอัตโนมัติด้วย:
 
 ```text
-httpdocs/admin.labedu.tech/tmp/restart.txt
+admin.labedu.tech/tmp/restart.txt
 ```
 
 ## ตรวจปัญหา
