@@ -1,0 +1,121 @@
+name: CI/CD to Plesk
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-plesk
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  PLESK_HOST: "118.27.146.122"
+  PLESK_USER: "admin_lebedu"
+  PLESK_DEPLOY_PATH: "/var/www/vhosts/labedu.tech/httpdocs/admin.labedu.tech"
+  PLESK_SSH_PORT: ${{ vars.PLESK_SSH_PORT || '22' }}
+  PRODUCTION_URL: "https://admin.labedu.tech"
+
+jobs:
+  test-build-deploy:
+    name: Test, build, and deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://admin.labedu.tech
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Validate required secrets
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          PLESK_SSH_PRIVATE_KEY: ${{ secrets.PLESK_SSH_PRIVATE_KEY }}
+          PLESK_SSH_KNOWN_HOSTS: ${{ secrets.PLESK_SSH_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          for variable_name in NEXT_PUBLIC_API_URL PLESK_SSH_PRIVATE_KEY PLESK_SSH_KNOWN_HOSTS; do
+            eval "variable_value=\${$variable_name:-}"
+            if [ -z "$variable_value" ]; then
+              echo "::error::$variable_name is not configured"
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test and create standalone bundle
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: npm test
+
+      - name: Verify deployment bundle
+        run: |
+          set -eu
+          test -f dist/standalone/server.js
+          test -d dist/standalone/dist/client
+          test -d dist/standalone/node_modules
+
+      - name: Configure SSH
+        env:
+          PLESK_SSH_PRIVATE_KEY: ${{ secrets.PLESK_SSH_PRIVATE_KEY }}
+          PLESK_SSH_KNOWN_HOSTS: ${{ secrets.PLESK_SSH_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PLESK_SSH_PRIVATE_KEY" > "$HOME/.ssh/plesk_deploy"
+          printf '%s\n' "$PLESK_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/plesk_deploy" "$HOME/.ssh/known_hosts"
+
+      - name: Deploy standalone bundle
+        run: |
+          set -eu
+          SSH_COMMAND="ssh -i $HOME/.ssh/plesk_deploy -p $PLESK_SSH_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
+
+          $SSH_COMMAND "$PLESK_USER@$PLESK_HOST" \
+            "install -d -m 755 '$PLESK_DEPLOY_PATH' '$PLESK_DEPLOY_PATH/tmp'"
+
+          rsync \
+            --archive \
+            --compress \
+            --delete \
+            --delay-updates \
+            --exclude "tmp/" \
+            --exclude "dist/client/.well-known/" \
+            --rsh "$SSH_COMMAND" \
+            dist/standalone/ \
+            "$PLESK_USER@$PLESK_HOST:$PLESK_DEPLOY_PATH/"
+
+          $SSH_COMMAND "$PLESK_USER@$PLESK_HOST" \
+            "touch '$PLESK_DEPLOY_PATH/tmp/restart.txt'"
+
+      - name: Verify production
+        run: |
+          set -u
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --location \
+              --max-time 20 "$PRODUCTION_URL/" > /dev/null; then
+              echo "Production is healthy: $PRODUCTION_URL"
+              exit 0
+            fi
+            echo "Health check attempt $attempt failed; retrying in 10 seconds"
+            sleep 10
+          done
+          echo "::error::Production health check failed: $PRODUCTION_URL"
+          exit 1
