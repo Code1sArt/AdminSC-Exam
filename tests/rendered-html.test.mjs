@@ -13,13 +13,13 @@ async function render() {
   );
 }
 
-test("server-renders SC Exam admin panel metadata", async () => {
+test("server-renders Lab EDU admin panel metadata", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<html lang="th">/i);
-  assert.match(html, /<title>SC Exam — ผู้ดูแลระบบ<\/title>/i);
+  assert.match(html, /<title>Lab EDU — ผู้ดูแลระบบ<\/title>/i);
   assert.match(html, /กำลังเตรียมระบบ/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });

@@ -803,12 +803,12 @@ export function AdminApp() {
   /* Session hydration and API loading intentionally synchronize external state. */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    setToken(sessionStorage.getItem("sc_exam_admin_token"));
+    setToken(sessionStorage.getItem("lab_edu_admin_token"));
     setHydrated(true);
   }, []);
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem("sc_exam_admin_token");
+    sessionStorage.removeItem("lab_edu_admin_token");
     setToken(null);
     setProfile(null);
     setDashboard(null);
@@ -1062,7 +1062,7 @@ export function AdminApp() {
         "/auth/login",
         jsonBody({ identifier: form.get("identifier"), password: form.get("password") }),
       );
-      sessionStorage.setItem("sc_exam_admin_token", result.accessToken);
+      sessionStorage.setItem("lab_edu_admin_token", result.accessToken);
       setToken(result.accessToken);
       await Swal.fire({
         icon: "success",
@@ -1514,7 +1514,7 @@ export function AdminApp() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "sc-exam-student-import-example.csv";
+    link.download = "lab-edu-student-import-example.csv";
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -2232,7 +2232,7 @@ export function AdminApp() {
             <BrainCircuit size={25} />
           </div>
           <div>
-            <strong>SC Exam</strong>
+            <strong>Lab EDU</strong>
             <span>AI Assessment</span>
           </div>
           <button
@@ -2588,7 +2588,7 @@ function LoginScreen({
             <BrainCircuit size={28} />
           </div>
           <div>
-            <strong>SC Exam</strong>
+            <strong>Lab EDU</strong>
             <span>AI Assessment Platform</span>
           </div>
         </div>
@@ -2632,9 +2632,9 @@ function LoginScreen({
             <div className="brand-mark">
               <BrainCircuit />
             </div>
-            <strong>SC Exam</strong>
+            <strong>Lab EDU</strong>
           </div>
-          <span className="login-kicker">SC EXAM PORTAL</span>
+          <span className="login-kicker">LAB EDU PORTAL</span>
           <h2>ยินดีต้อนรับกลับมา</h2>
           <p>เข้าสู่ระบบสำหรับผู้ดูแล ครู และนักเรียน</p>
           <label>
@@ -4790,7 +4790,7 @@ function AiInsightsView({
           <Sparkles />
         </div>
         <div>
-          <span>SC EXAM INTELLIGENCE</span>
+          <span>LAB EDU INTELLIGENCE</span>
           <h2>AI ช่วยมองเห็นสิ่งที่คะแนนอย่างเดียวบอกไม่ได้</h2>
           <p>ข้อมูลส่วนนี้จะชัดขึ้นเมื่อมีการสอบและการตอบคำถามมากขึ้น</p>
         </div>
@@ -5628,7 +5628,7 @@ function QuestionImportDialog({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "sc-exam-questions-example.json";
+    link.download = "lab-edu-questions-example.json";
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -6426,7 +6426,7 @@ function DataModal({
       >
         <header>
           <div>
-            <span>{kind === "generate" ? "AI ASSISTANT" : "SC EXAM"}</span>
+            <span>{kind === "generate" ? "AI ASSISTANT" : "LAB EDU"}</span>
             <h2>{titles[kind]}</h2>
           </div>
           <button className="icon-button" onClick={onClose}>

@@ -13,17 +13,17 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = `${protocol}://${host}`;
   return {
     metadataBase: new URL(origin),
-    title: "SC Exam — ผู้ดูแลระบบ",
-    description: "ระบบบริหารจัดการแพลตฟอร์มวัดผลการเรียนรู้ด้วย AI",
+    title: "Lab EDU — ผู้ดูแลระบบ",
+    description: "พื้นที่บริหารจัดการการเรียนรู้ การวัดผล และการวิเคราะห์ด้วย AI",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "SC Exam — AI Assessment Platform",
+      title: "Lab EDU — AI Assessment Platform",
       description: "วัดผลอย่างเข้าใจผู้เรียนด้วยระบบข้อสอบและการวิเคราะห์ด้วย AI",
-      images: [{ url: `${origin}/og.png`, width: 1733, height: 909, alt: "SC Exam AI Assessment Platform" }],
+      images: [{ url: `${origin}/og.png`, width: 1727, height: 911, alt: "Lab EDU AI Assessment Platform" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "SC Exam — AI Assessment Platform",
+      title: "Lab EDU — AI Assessment Platform",
       description: "วัดผลอย่างเข้าใจผู้เรียนด้วยระบบข้อสอบและการวิเคราะห์ด้วย AI",
       images: [`${origin}/og.png`],
     },
