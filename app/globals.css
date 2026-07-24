@@ -33,17 +33,33 @@ body {
   line-height: 1.65;
 }
 
-/* The interface originally used compact, fixed-pixel type throughout.
-   Scale the complete desktop UI together so labels, tables, controls, and
-   dialogs stay in proportion instead of enlarging only selected pages. */
+/* Keep the original page and dialog proportions. Only lift the reading-sized
+   text inside the main workspace on desktop screens. */
 @media (min-width: 1280px) {
-  body {
-    zoom: 1.2;
+  .content-wrap {
+    font-size: 15px;
   }
-}
-@media (min-width: 1600px) {
-  body {
-    zoom: 1.3;
+  .content-wrap :is(p, li) {
+    font-size: 13px;
+  }
+  .content-wrap :is(input, select, textarea) {
+    font-size: 13px;
+  }
+  .content-wrap table {
+    font-size: 12px;
+  }
+  .content-wrap th {
+    font-size: 10px;
+  }
+  .content-wrap td strong {
+    font-size: 12px;
+  }
+  .content-wrap td span,
+  .content-wrap .panel-header p,
+  .content-wrap .assignment-summary small,
+  .content-wrap .metric-card span,
+  .content-wrap .metric-card small {
+    font-size: 11px;
   }
 }
 button,
