@@ -53,6 +53,9 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /`\/academic\/subjects\/\$\{editingSubject\.id\}`/);
   assert.match(app, /`\/academic\/indicators\/\$\{editingIndicator\.id\}`/);
   assert.match(app, /ลบตัวชี้วัด/);
+  assert.match(app, /label="ครูผู้สอน"/);
+  assert.doesNotMatch(app, /label="ครูประจำชั้น"/);
+  assert.match(app, /api<Teacher\[]>\("\/academic\/teachers"/);
   assert.match(app, /งานและการให้คะแนน/);
   assert.match(app, /\/assignments\/grade-scale/);
   assert.match(app, /ให้คะแนน/);

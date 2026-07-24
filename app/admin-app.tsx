@@ -891,7 +891,11 @@ export function AdminApp() {
       if (silent) setRefreshing(true);
       else setLoading(true);
       try {
-        if (!profile) setProfile(await api<UserProfile>("/auth/me", {}, token));
+        let currentProfile = profile;
+        if (!currentProfile) {
+          currentProfile = await api<UserProfile>("/auth/me", {}, token);
+          setProfile(currentProfile);
+        }
         if (target === "dashboard") {
           setDashboard(
             await api<DashboardData>("/analytics/dashboard", {}, token),
@@ -913,15 +917,17 @@ export function AdminApp() {
         } else if (target === "teachers") {
           setTeachers(await api<Teacher[]>("/academic/teachers", {}, token));
         } else if (target === "classrooms") {
-          const classRows = await api<Classroom[]>(
-            "/academic/classrooms",
-            {},
-            token,
-          );
-          setClassrooms(classRows);
-          if (profile?.role === "ADMIN") {
-            setTeachers(await api<Teacher[]>("/academic/teachers", {}, token));
+          if (currentProfile.role === "ADMIN") {
+            const [classRows, teacherRows] = await Promise.all([
+              api<Classroom[]>("/academic/classrooms", {}, token),
+              api<Teacher[]>("/academic/teachers", {}, token),
+            ]);
+            setClassrooms(classRows);
+            setTeachers(teacherRows);
           } else {
+            setClassrooms(
+              await api<Classroom[]>("/academic/classrooms", {}, token),
+            );
             setTeachers([]);
           }
         } else if (target === "subjects") {
@@ -3089,7 +3095,7 @@ function ClassroomsView({
                 <span>ปีการศึกษา {room.academicYear}</span>
               </div>
               <p>
-                ครู {room.teacher.firstName} {room.teacher.lastName}
+                ครูผู้สอน {room.teacher.firstName} {room.teacher.lastName}
               </p>
               <div className="classroom-meta">
                 <span>
@@ -6521,13 +6527,18 @@ function DataModal({
                 </div>
                 {!isTeacher && (
                   <SelectField
-                    label="ครูประจำชั้น"
+                    label="ครูผู้สอน"
                     name="teacherId"
-                    options={teachers.map((teacher) => ({
-                      value: teacher.id,
-                      label: `${teacher.firstName} ${teacher.lastName}`,
-                    }))}
-                    optional
+                    options={teachers
+                      .filter(
+                        (teacher) =>
+                          teacher.isActive ||
+                          teacher.id === editingClassroom?.teacher.id,
+                      )
+                      .map((teacher) => ({
+                        value: teacher.id,
+                        label: `${teacher.firstName} ${teacher.lastName}`,
+                      }))}
                     defaultValue={editingClassroom?.teacher.id}
                   />
                 )}
