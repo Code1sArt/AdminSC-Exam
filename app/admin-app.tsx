@@ -4989,20 +4989,20 @@ function AiModelsView({
             />
           </div>
           <div className="model-field">
-            <div className="provider-icon gemini">G</div>
+            <div className="provider-icon gemini">AI</div>
             <ModelSelect
               label="โมเดลตรวจคำตอบและให้เหตุผล"
               name="reasoningModel"
-              models={geminiModels}
+              models={models}
               currentValue={selected.aiReasoningModel ?? "gemini-2.5-flash"}
             />
           </div>
           <div className="model-field">
-            <div className="provider-icon report">R</div>
+            <div className="provider-icon report">AI</div>
             <ModelSelect
               label="โมเดลสร้างรายงาน"
               name="reportModel"
-              models={geminiModels}
+              models={models}
               currentValue={selected.aiReportModel ?? "gemini-2.5-flash-lite"}
             />
           </div>
