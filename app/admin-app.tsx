@@ -290,6 +290,7 @@ interface AssignmentSubmission {
     };
   }>;
   student: {
+    id: string;
     studentCode: string;
     user: { firstName: string; lastName: string };
   };
@@ -311,6 +312,11 @@ interface Assignment {
   maxGroupSize: number;
   classroom: { id: string; name: string };
   subject: { id: string; name: string };
+  students: Array<{
+    id: string;
+    studentCode: string;
+    user: { firstName: string; lastName: string };
+  }>;
   submissions: AssignmentSubmission[];
   _count: { submissions: number };
 }
@@ -1749,6 +1755,114 @@ export function AdminApp() {
     }
   };
 
+  const gradeClassroom = async (
+    assignment: Assignment,
+    selectedStudentId?: string,
+  ) => {
+    if (!token || assignment.isGroupWork) return;
+    const submissionByStudent = new Map(
+      assignment.submissions.map((submission) => [
+        submission.student.id,
+        submission,
+      ]),
+    );
+    const studentFields = assignment.students
+      .map((student) => {
+        const submission = submissionByStudent.get(student.id);
+        const hasScore =
+          submission?.score !== null && submission?.score !== undefined;
+        return `<label class="swal-class-score${student.id === selectedStudentId ? " is-selected" : ""}"><span><b>${escapeHtml(student.user.firstName)} ${escapeHtml(student.user.lastName)}</b><small>${escapeHtml(student.studentCode)} · ${submission?.content || submission?.attachmentUrl || submission?.attachmentUrls?.length ? "ส่งในระบบแล้ว" : hasScore ? "ครูบันทึกคะแนนแล้ว" : "ยังไม่ส่งในระบบ"}</small></span><input data-class-score="${escapeHtml(student.id)}" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" value="${hasScore ? Number(submission.score) : ""}" placeholder="—"></label>`;
+      })
+      .join("");
+    const result = await Swal.fire({
+      title: `ให้คะแนนทั้งห้อง · ${assignment.classroom.name}`,
+      html: `<p class="swal-class-grade-note">กรอกคะแนนได้ทันทีแม้นักเรียนส่งงานนอกระบบหรือยังไม่มีรายการส่งงาน</p><div class="swal-fill-all"><input id="classroom-shared-score" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" placeholder="คะแนนเต็ม ${Number(assignment.maxScore)}"><button id="fill-classroom-scores" type="button">ใส่คะแนนนี้ทุกคน</button></div><div class="swal-class-scores">${studentFields}</div><label class="swal-field">ความคิดเห็นเดียวกัน (เว้นว่างได้)<textarea id="classroom-feedback" rows="3"></textarea></label>`,
+      width: 680,
+      showCancelButton: true,
+      confirmButtonText: "บันทึกคะแนน",
+      cancelButtonText: "ยกเลิก",
+      didOpen: () => {
+        const popup = Swal.getPopup();
+        popup
+          ?.querySelector("#fill-classroom-scores")
+          ?.addEventListener("click", () => {
+            const shared = (
+              popup.querySelector(
+                "#classroom-shared-score",
+              ) as HTMLInputElement
+            ).value;
+            popup
+              .querySelectorAll<HTMLInputElement>("[data-class-score]")
+              .forEach((input) => {
+                input.value = shared;
+              });
+          });
+        if (selectedStudentId) {
+          const selected = popup?.querySelector(".swal-class-score.is-selected");
+          selected?.scrollIntoView({ block: "center" });
+          selected?.querySelector("input")?.focus();
+        }
+      },
+      preConfirm: () => {
+        const popup = Swal.getPopup();
+        const grades = Array.from(
+          popup?.querySelectorAll<HTMLInputElement>("[data-class-score]") ?? [],
+        )
+          .filter((input) => input.value.trim() !== "")
+          .map((input) => ({
+            studentId: input.dataset.classScore!,
+            score: Number(input.value),
+          }));
+        if (!grades.length) {
+          Swal.showValidationMessage("กรุณากรอกคะแนนอย่างน้อย 1 คน");
+          return false;
+        }
+        if (
+          grades.some(
+            ({ score }) =>
+              !Number.isFinite(score) ||
+              score < 0 ||
+              score > Number(assignment.maxScore),
+          )
+        ) {
+          Swal.showValidationMessage(
+            `คะแนนต้องอยู่ระหว่าง 0-${Number(assignment.maxScore)}`,
+          );
+          return false;
+        }
+        const feedback = (
+          popup?.querySelector("#classroom-feedback") as HTMLTextAreaElement
+        )?.value;
+        return {
+          grades: grades.map((grade) => ({
+            ...grade,
+            feedback:
+              feedback.trim() ||
+              submissionByStudent.get(grade.studentId)?.feedback ||
+              undefined,
+          })),
+        };
+      },
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await api(
+        `/assignments/${assignment.id}/grades`,
+        { ...jsonBody(result.value), method: "PATCH" },
+        token,
+      );
+      await loadPage("assignments", true);
+      await Swal.fire({
+        icon: "success",
+        title: `บันทึกคะแนนแล้ว ${result.value.grades.length} คน`,
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    }
+  };
+
   const runSubmissionCode = async (
     assignment: Assignment,
     submission: AssignmentSubmission,
@@ -2459,6 +2573,7 @@ export function AdminApp() {
               onDelete={deleteAssignment}
               onStatus={updateAssignmentStatus}
               onGrade={gradeSubmission}
+              onGradeClassroom={gradeClassroom}
               onRunCode={runSubmissionCode}
               onEditScale={editGradeScale}
             />
@@ -3692,6 +3807,7 @@ function AssignmentsView({
   onDelete,
   onStatus,
   onGrade,
+  onGradeClassroom,
   onRunCode,
   onEditScale,
 }: {
@@ -3701,6 +3817,10 @@ function AssignmentsView({
   onDelete: (row: Assignment) => void;
   onStatus: (row: Assignment) => void;
   onGrade: (assignment: Assignment, submission: AssignmentSubmission) => void;
+  onGradeClassroom: (
+    assignment: Assignment,
+    selectedStudentId?: string,
+  ) => void;
   onRunCode: (assignment: Assignment, submission: AssignmentSubmission) => void;
   onEditScale: () => void;
 }) {
@@ -3910,6 +4030,14 @@ function AssignmentsView({
                 <span>
                   คะแนนเต็ม <b>{Number(assignment.maxScore)}</b>
                 </span>
+                {!assignment.isGroupWork && (
+                  <button
+                    className="grade-classroom-button"
+                    onClick={() => void onGradeClassroom(assignment)}
+                  >
+                    <Users /> ให้คะแนนทั้งห้อง
+                  </button>
+                )}
                 <button onClick={() => onEdit(assignment)}>
                   <PencilLine /> แก้ไข
                 </button>
@@ -3937,8 +4065,9 @@ function AssignmentsView({
                     </tr>
                   </thead>
                   <tbody>
-                    {assignment.submissions.length ? (
-                      assignment.submissions.map((submission) => (
+                    {assignment.isGroupWork ? (
+                      assignment.submissions.length ? (
+                        assignment.submissions.map((submission) => (
                         <tr key={submission.id}>
                           <td>
                             {assignment.isGroupWork ? (
@@ -4048,9 +4177,118 @@ function AssignmentsView({
                             </button>
                           </td>
                         </tr>
-                      ))
+                        ))
+                      ) : (
+                        <TableEmpty colSpan={5} />
+                      )
                     ) : (
-                      <TableEmpty colSpan={5} />
+                      assignment.students.length ? (
+                        assignment.students.map((student) => {
+                          const submission = assignment.submissions.find(
+                            (item) => item.student.id === student.id,
+                          );
+                          const hasWork = Boolean(
+                            submission?.content ||
+                              submission?.attachmentUrl ||
+                              submission?.attachmentUrls?.length,
+                          );
+                          return (
+                            <tr key={student.id}>
+                              <td>
+                                <strong>
+                                  {student.user.firstName} {student.user.lastName}
+                                </strong>
+                                <span>{student.studentCode}</span>
+                              </td>
+                              <td>
+                                {hasWork && submission
+                                  ? date(submission.submittedAt)
+                                  : "—"}
+                                {!hasWork && (
+                                  <span className="not-submitted-label">
+                                    ยังไม่ส่งในระบบ
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                {assignment.type === "CODE" &&
+                                submission?.content ? (
+                                  <button
+                                    className="code-read-button"
+                                    onClick={() =>
+                                      void showCodeSubmission(
+                                        assignment,
+                                        submission,
+                                      )
+                                    }
+                                  >
+                                    <Eye /> อ่าน Source Code
+                                  </button>
+                                ) : submission?.content ? (
+                                  <span>{submission.content}</span>
+                                ) : (
+                                  <span className="muted-cell">
+                                    รับงานนอกระบบได้
+                                  </span>
+                                )}
+                                {(submission?.attachmentUrls?.length
+                                  ? submission.attachmentUrls
+                                  : submission?.attachmentUrl
+                                    ? [submission.attachmentUrl]
+                                    : []
+                                ).map((url, index) => (
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    key={url}
+                                  >
+                                    เปิดลิงก์งาน {index + 1}
+                                  </a>
+                                ))}
+                              </td>
+                              <td>
+                                <strong>
+                                  {submission?.score == null
+                                    ? "ยังไม่ให้คะแนน"
+                                    : `${Number(submission.score)}/${Number(assignment.maxScore)}`}
+                                </strong>
+                                {submission?.assessment && (
+                                  <span className="grade-chip">
+                                    {submission.assessment}
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                {assignment.type === "CODE" &&
+                                  submission?.content && (
+                                    <button
+                                      className="button secondary compact-button"
+                                      onClick={() =>
+                                        onRunCode(assignment, submission)
+                                      }
+                                    >
+                                      รันโค้ด
+                                    </button>
+                                  )}
+                                <button
+                                  className="button secondary compact-button"
+                                  onClick={() =>
+                                    void onGradeClassroom(
+                                      assignment,
+                                      student.id,
+                                    )
+                                  }
+                                >
+                                  ให้คะแนน
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <TableEmpty colSpan={5} />
+                      )
                     )}
                   </tbody>
                 </table>
