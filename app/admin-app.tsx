@@ -727,6 +727,7 @@ const studentImportExample = [
   ["STU001", "สมชาย", "ใจดี", "stu001@example.com", "Student123!", "ม.1"],
   ["STU002", "สมหญิง", "เรียนเก่ง", "stu002@example.com", "Student123!", "ม.1"],
 ];
+const studentPageSize = 20;
 
 export function AdminApp() {
   const [token, setToken] = useState<string | null>(null);
@@ -740,6 +741,9 @@ export function AdminApp() {
   const [search, setSearch] = useState("");
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentClassroomId, setStudentClassroomId] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] = useState("");
+  const [studentPage, setStudentPage] = useState(1);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -881,6 +885,7 @@ export function AdminApp() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
+    if (page === "students") setStudentPage(1);
     if (page !== "questions") return;
     const next = { ...questionFilters, search: value };
     setQuestionFilters(next);
@@ -1056,14 +1061,20 @@ export function AdminApp() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const filteredStudents = useMemo(() => {
+    if (!studentClassroomId) return [];
     const keyword = search.trim().toLocaleLowerCase("th-TH");
-    if (!keyword) return students;
     return students.filter((student) =>
-      `${student.studentCode} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
-        .toLocaleLowerCase("th-TH")
-        .includes(keyword),
+      student.enrollments.some(
+        (enrollment) => enrollment.classroom.id === studentClassroomId,
+      ) &&
+      (!studentStatusFilter ||
+        (studentStatusFilter === "ACTIVE") === student.user.isActive) &&
+      (!keyword ||
+        `${student.studentCode} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
+          .toLocaleLowerCase("th-TH")
+          .includes(keyword)),
     );
-  }, [search, students]);
+  }, [search, studentClassroomId, studentStatusFilter, students]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2513,6 +2524,19 @@ export function AdminApp() {
           {!loading && page === "students" && (
             <StudentsView
               rows={filteredStudents}
+              classrooms={classrooms}
+              selectedClassroomId={studentClassroomId}
+              statusFilter={studentStatusFilter}
+              page={studentPage}
+              onClassroomChange={(classroomId) => {
+                setStudentClassroomId(classroomId);
+                setStudentPage(1);
+              }}
+              onStatusFilterChange={(status) => {
+                setStudentStatusFilter(status);
+                setStudentPage(1);
+              }}
+              onPageChange={setStudentPage}
               onEdit={(student) => {
                 setEditingStudent(student);
                 setModal("student");
@@ -3077,19 +3101,80 @@ function DashboardView({
 
 function StudentsView({
   rows,
+  classrooms,
+  selectedClassroomId,
+  statusFilter,
+  page,
+  onClassroomChange,
+  onStatusFilterChange,
+  onPageChange,
   onEdit,
   onDelete,
 }: {
   rows: Student[];
+  classrooms: Classroom[];
+  selectedClassroomId: string;
+  statusFilter: string;
+  page: number;
+  onClassroomChange: (classroomId: string) => void;
+  onStatusFilterChange: (status: string) => void;
+  onPageChange: (page: number) => void;
   onEdit: (student: Student) => void;
   onDelete: (student: Student) => void;
 }) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / studentPageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = rows.length ? (currentPage - 1) * studentPageSize + 1 : 0;
+  const pageEnd = Math.min(currentPage * studentPageSize, rows.length);
+  const pageRows = rows.slice(pageStart - 1, pageEnd);
+  const visiblePages = Array.from(
+    { length: Math.min(5, pageCount) },
+    (_, index) => {
+      const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
+      return start + index;
+    },
+  );
+
   return (
     <section className="panel full-panel">
       <PanelHeader
-        title={`นักเรียน ${rows.length} คน`}
-        subtitle="บัญชีนักเรียนภายในโรงเรียน"
+        title={
+          selectedClassroomId ? `นักเรียน ${rows.length} คน` : "นักเรียน"
+        }
+        subtitle="เลือกห้องเรียนก่อนเพื่อดูรายชื่อนักเรียน"
       />
+      <div className="student-filters">
+        <label>
+          ห้องเรียน
+          <select
+            value={selectedClassroomId}
+            onChange={(event) => onClassroomChange(event.target.value)}
+          >
+            <option value="">เลือกห้องเรียน</option>
+            {classrooms.map((classroom) => (
+              <option key={classroom.id} value={classroom.id}>
+                {classroom.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          สถานะ
+          <select
+            value={statusFilter}
+            onChange={(event) => onStatusFilterChange(event.target.value)}
+            disabled={!selectedClassroomId}
+          >
+            <option value="">ทุกสถานะ</option>
+            <option value="ACTIVE">ใช้งาน</option>
+            <option value="INACTIVE">ปิดใช้งาน</option>
+          </select>
+        </label>
+      </div>
+      {!selectedClassroomId ? (
+        <EmptyState title="เลือกห้องเรียนเพื่อแสดงรายชื่อนักเรียน" />
+      ) : (
+        <>
       <div className="table-wrap">
         <table>
           <thead>
@@ -3104,8 +3189,8 @@ function StudentsView({
             </tr>
           </thead>
           <tbody>
-            {rows.length ? (
-              rows.map((student) => (
+            {pageRows.length ? (
+              pageRows.map((student) => (
                 <tr key={student.id}>
                   <td>
                     <span className="code-chip">{student.studentCode}</span>
@@ -3155,6 +3240,40 @@ function StudentsView({
           </tbody>
         </table>
       </div>
+      <footer className="pagination">
+        <span>
+          แสดง {pageStart.toLocaleString("th-TH")}–
+          {pageEnd.toLocaleString("th-TH")} จาก {rows.length.toLocaleString("th-TH")} คน
+        </span>
+        <div>
+          <button
+            type="button"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            ‹
+          </button>
+          {visiblePages.map((pageNumber) => (
+            <button
+              type="button"
+              className={pageNumber === currentPage ? "active" : ""}
+              onClick={() => onPageChange(pageNumber)}
+              key={pageNumber}
+            >
+              {pageNumber}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= pageCount}
+          >
+            ›
+          </button>
+        </div>
+      </footer>
+        </>
+      )}
     </section>
   );
 }
