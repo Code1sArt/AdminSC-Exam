@@ -1672,6 +1672,14 @@ td span {
   background: #f5f3ff;
   font-weight: 700;
 }
+.swal-class-search {
+  width: 100%;
+  margin-bottom: 10px;
+  border: 1px solid #dfe3eb;
+  border-radius: 8px;
+  padding: 9px 11px;
+  font: inherit;
+}
 .swal-class-scores {
   display: grid;
   gap: 7px;

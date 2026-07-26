@@ -1776,13 +1776,27 @@ export function AdminApp() {
       .join("");
     const result = await Swal.fire({
       title: `ให้คะแนนทั้งห้อง · ${assignment.classroom.name}`,
-      html: `<p class="swal-class-grade-note">กรอกคะแนนได้ทันทีแม้นักเรียนส่งงานนอกระบบหรือยังไม่มีรายการส่งงาน</p><div class="swal-fill-all"><input id="classroom-shared-score" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" placeholder="คะแนนเต็ม ${Number(assignment.maxScore)}"><button id="fill-classroom-scores" type="button">ใส่คะแนนนี้ทุกคน</button></div><div class="swal-class-scores">${studentFields}</div><label class="swal-field">ความคิดเห็นเดียวกัน (เว้นว่างได้)<textarea id="classroom-feedback" rows="3"></textarea></label>`,
+      html: `<p class="swal-class-grade-note">กรอกคะแนนได้ทันทีแม้นักเรียนส่งงานนอกระบบหรือยังไม่มีรายการส่งงาน</p><div class="swal-fill-all"><input id="classroom-shared-score" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" placeholder="คะแนนเต็ม ${Number(assignment.maxScore)}"><button id="fill-classroom-scores" type="button">ใส่คะแนนนี้ทุกคน</button></div><input id="classroom-student-search" class="swal-class-search" type="search" placeholder="ค้นหาชื่อนักเรียน หรือรหัสนักเรียน"><div class="swal-class-scores">${studentFields}</div><label class="swal-field">ความคิดเห็นเดียวกัน (เว้นว่างได้)<textarea id="classroom-feedback" rows="3"></textarea></label>`,
       width: 680,
       showCancelButton: true,
       confirmButtonText: "บันทึกคะแนน",
       cancelButtonText: "ยกเลิก",
       didOpen: () => {
         const popup = Swal.getPopup();
+        const search = popup?.querySelector(
+          "#classroom-student-search",
+        ) as HTMLInputElement | null;
+        search?.addEventListener("input", () => {
+          const query = search.value.trim().toLocaleLowerCase();
+          popup
+            ?.querySelectorAll<HTMLElement>(".swal-class-score")
+            .forEach((field) => {
+              field.classList.toggle(
+                "is-hidden",
+                Boolean(query) && !field.textContent?.toLocaleLowerCase().includes(query),
+              );
+            });
+        });
         popup
           ?.querySelector("#fill-classroom-scores")
           ?.addEventListener("click", () => {
