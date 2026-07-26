@@ -9,6 +9,7 @@ import {
   BrainCircuit,
   Building2,
   ChevronDown,
+  ChevronUp,
   CircleHelp,
   CircleDollarSign,
   ClipboardCheck,
@@ -728,6 +729,7 @@ const studentImportExample = [
   ["STU002", "สมหญิง", "เรียนเก่ง", "stu002@example.com", "Student123!", "ม.1"],
 ];
 const studentPageSize = 20;
+type StudentSortKey = "code" | "name" | "grade" | "classroom" | "email" | "status";
 
 export function AdminApp() {
   const [token, setToken] = useState<string | null>(null);
@@ -3122,11 +3124,60 @@ function StudentsView({
   onEdit: (student: Student) => void;
   onDelete: (student: Student) => void;
 }) {
-  const pageCount = Math.max(1, Math.ceil(rows.length / studentPageSize));
+  const [sortKey, setSortKey] = useState<StudentSortKey>("code");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const sortedRows = useMemo(() => {
+    const collator = new Intl.Collator("th-TH", { numeric: true, sensitivity: "base" });
+    const valueFor = (student: Student) => {
+      switch (sortKey) {
+        case "name":
+          return `${student.user.firstName} ${student.user.lastName}`;
+        case "grade":
+          return student.gradeLevel || "";
+        case "classroom":
+          return student.enrollments.map((item) => item.classroom.name).join(", ");
+        case "email":
+          return student.user.email;
+        case "status":
+          return student.user.isActive ? "ใช้งาน" : "ปิดใช้งาน";
+        default:
+          return student.studentCode;
+      }
+    };
+    return [...rows].sort((left, right) =>
+      collator.compare(valueFor(left), valueFor(right)) *
+      (sortDirection === "asc" ? 1 : -1),
+    );
+  }, [rows, sortDirection, sortKey]);
+  const changeSort = (key: StudentSortKey) => {
+    if (key === sortKey) {
+      setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+    onPageChange(1);
+  };
+  const sortableHeader = (label: string, key: StudentSortKey) => {
+    const isActive = sortKey === key;
+    return (
+      <th aria-sort={isActive ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+        <button
+          type="button"
+          className={`table-sort${isActive ? " active" : ""}`}
+          onClick={() => changeSort(key)}
+        >
+          {label}
+          {isActive && (sortDirection === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}
+        </button>
+      </th>
+    );
+  };
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / studentPageSize));
   const currentPage = Math.min(page, pageCount);
-  const pageStart = rows.length ? (currentPage - 1) * studentPageSize + 1 : 0;
-  const pageEnd = Math.min(currentPage * studentPageSize, rows.length);
-  const pageRows = rows.slice(pageStart - 1, pageEnd);
+  const pageStart = sortedRows.length ? (currentPage - 1) * studentPageSize + 1 : 0;
+  const pageEnd = Math.min(currentPage * studentPageSize, sortedRows.length);
+  const pageRows = sortedRows.slice(pageStart - 1, pageEnd);
   const visiblePages = Array.from(
     { length: Math.min(5, pageCount) },
     (_, index) => {
@@ -3179,12 +3230,12 @@ function StudentsView({
         <table>
           <thead>
             <tr>
-              <th>รหัส</th>
-              <th>ชื่อ–นามสกุล</th>
-              <th>ระดับชั้น</th>
-              <th>ห้องเรียน</th>
-              <th>อีเมล</th>
-              <th>สถานะ</th>
+              {sortableHeader("รหัส", "code")}
+              {sortableHeader("ชื่อ–นามสกุล", "name")}
+              {sortableHeader("ระดับชั้น", "grade")}
+              {sortableHeader("ห้องเรียน", "classroom")}
+              {sortableHeader("อีเมล", "email")}
+              {sortableHeader("สถานะ", "status")}
               <th>จัดการ</th>
             </tr>
           </thead>
@@ -3243,7 +3294,7 @@ function StudentsView({
       <footer className="pagination">
         <span>
           แสดง {pageStart.toLocaleString("th-TH")}–
-          {pageEnd.toLocaleString("th-TH")} จาก {rows.length.toLocaleString("th-TH")} คน
+          {pageEnd.toLocaleString("th-TH")} จาก {sortedRows.length.toLocaleString("th-TH")} คน
         </span>
         <div>
           <button

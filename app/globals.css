@@ -3708,6 +3708,22 @@ td span {
   color: #9aa2af;
   background: #f3f4f6;
 }
+.table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+.table-sort:hover,
+.table-sort.active {
+  color: #6558e8;
+}
 .filter-reset {
   height: 38px;
   border: 1px solid #dedbea;
