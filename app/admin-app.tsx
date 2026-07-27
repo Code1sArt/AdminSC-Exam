@@ -307,6 +307,7 @@ interface Assignment {
   status: "DRAFT" | "PUBLISHED" | "CLOSED";
   type: "GENERAL" | "CODE";
   codeLanguage?: "C" | "CPP" | "CSHARP" | "PYTHON" | null;
+  problemPdfUrl?: string | null;
   aiGradingEnabled: boolean;
   aiGradingModel?: string | null;
   isGroupWork: boolean;
@@ -1234,6 +1235,10 @@ export function AdminApp() {
               codeLanguage:
                 data.get("type") === "CODE"
                   ? data.get("codeLanguage")
+                  : undefined,
+              problemPdfUrl:
+                data.get("type") === "CODE"
+                  ? data.get("problemPdfUrl")
                   : undefined,
               aiGradingEnabled:
                 data.get("type") === "CODE" &&
@@ -7350,6 +7355,19 @@ function DataModal({
                       ]}
                       defaultValue={editingAssignment?.codeLanguage ?? "PYTHON"}
                     />
+                    <label className="form-field">
+                      ลิงก์ไฟล์โจทย์ PDF จาก Google Drive
+                      <input
+                        name="problemPdfUrl"
+                        type="url"
+                        maxLength={2048}
+                        defaultValue={editingAssignment?.problemPdfUrl ?? ""}
+                        placeholder="https://drive.google.com/file/d/.../view"
+                      />
+                      <small className="field-hint">
+                        ตั้งค่าการแชร์ไฟล์เป็น “ทุกคนที่มีลิงก์” เพื่อให้นักเรียนเปิดดูได้
+                      </small>
+                    </label>
                     <label className="toggle-line">
                       <input
                         type="checkbox"
