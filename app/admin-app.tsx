@@ -25,6 +25,7 @@ import {
   PencilLine,
   RefreshCw,
   RotateCcw,
+  Code2,
   School,
   Search,
   Settings,
@@ -344,6 +345,7 @@ interface LockedAttempt {
 interface AiStatusData {
   mockMode: boolean;
   studentAiEnabled: boolean;
+  playgroundEnabled: boolean;
   services: Array<{
     id: string;
     provider: string;
@@ -2275,6 +2277,48 @@ export function AdminApp() {
     }
   };
 
+  const togglePlayground = async () => {
+    if (!token || !aiStatus) return;
+    const enabled = !aiStatus.playgroundEnabled;
+    if (!enabled) {
+      const answer = await Swal.fire({
+        icon: "warning",
+        title: "ปิดหน้า Playground?",
+        text: "เมนู Playground จะหายจากหน้านักเรียน และนักเรียนจะรันโค้ดหรือขอคำแนะนำใหม่ไม่ได้",
+        showCancelButton: true,
+        confirmButtonText: "ปิด Playground",
+        cancelButtonText: "ยกเลิก",
+        confirmButtonColor: "#d65b65",
+      });
+      if (!answer.isConfirmed) return;
+    }
+    setLoading(true);
+    try {
+      const result = await api<{ playgroundEnabled: boolean }>(
+        "/playground/access",
+        { ...jsonBody({ enabled }), method: "PATCH" },
+        token,
+      );
+      setAiStatus((current) =>
+        current
+          ? { ...current, playgroundEnabled: result.playgroundEnabled }
+          : current,
+      );
+      await Swal.fire({
+        icon: "success",
+        title: result.playgroundEnabled
+          ? "เปิด Playground แล้ว"
+          : "ปิด Playground แล้ว",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateAiModels = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) return;
@@ -2667,6 +2711,7 @@ export function AdminApp() {
               onUpdateName={updateOwnName}
               onChangePassword={changeOwnPassword}
               onToggleStudentAi={toggleStudentAi}
+              onTogglePlayground={togglePlayground}
             />
           )}
         </div>
@@ -5806,6 +5851,7 @@ function SettingsView({
   onUpdateName,
   onChangePassword,
   onToggleStudentAi,
+  onTogglePlayground,
 }: {
   profile: UserProfile | null;
   aiStatus: AiStatusData | null;
@@ -5813,6 +5859,7 @@ function SettingsView({
   onUpdateName: (event: FormEvent<HTMLFormElement>) => void;
   onChangePassword: (event: FormEvent<HTMLFormElement>) => void;
   onToggleStudentAi: () => void;
+  onTogglePlayground: () => void;
 }) {
   if (isTeacher)
     return (
@@ -5944,26 +5991,48 @@ function SettingsView({
           subtitle="กำหนดการใช้งาน AI ของผู้เรียนและตรวจสอบผู้ให้บริการ"
         />
         {profile?.role === "ADMIN" && (
-          <div className="student-ai-control">
-            <div>
-              <Bot />
-              <span>
-                <strong>AI สำหรับผู้เรียน</strong>
-                <small>คำแนะนำรายข้อและรายงานการเรียนรู้หลังสอบ</small>
-              </span>
+          <>
+            <div className="student-ai-control">
+              <div>
+                <Code2 />
+                <span>
+                  <strong>หน้า Playground</strong>
+                  <small>ให้นักเรียนทดลองเขียนและรันโค้ด C++, C# และ Python</small>
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`availability-switch ${aiStatus?.playgroundEnabled ? "on" : "off"}`}
+                role="switch"
+                aria-checked={aiStatus?.playgroundEnabled ?? false}
+                onClick={() => void onTogglePlayground()}
+                disabled={!aiStatus}
+              >
+                <i />
+                <span>{aiStatus?.playgroundEnabled ? "เปิด" : "ปิด"}</span>
+              </button>
             </div>
-            <button
-              type="button"
-              className={`availability-switch ${aiStatus?.studentAiEnabled ? "on" : "off"}`}
-              role="switch"
-              aria-checked={aiStatus?.studentAiEnabled ?? false}
-              onClick={() => void onToggleStudentAi()}
-              disabled={!aiStatus}
-            >
-              <i />
-              <span>{aiStatus?.studentAiEnabled ? "เปิด" : "ปิด"}</span>
-            </button>
-          </div>
+            <div className="student-ai-control">
+              <div>
+                <Bot />
+                <span>
+                  <strong>AI สำหรับผู้เรียน</strong>
+                  <small>คำแนะนำรายข้อ รายงานการเรียนรู้ และคำแนะนำโค้ดใน Playground</small>
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`availability-switch ${aiStatus?.studentAiEnabled ? "on" : "off"}`}
+                role="switch"
+                aria-checked={aiStatus?.studentAiEnabled ?? false}
+                onClick={() => void onToggleStudentAi()}
+                disabled={!aiStatus}
+              >
+                <i />
+                <span>{aiStatus?.studentAiEnabled ? "เปิด" : "ปิด"}</span>
+              </button>
+            </div>
+          </>
         )}
         {aiStatus?.mockMode && (
           <div className="mock-mode-note">
