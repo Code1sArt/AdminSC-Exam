@@ -171,6 +171,7 @@ interface Question {
   type: string;
   difficulty: string;
   prompt: string;
+  imageUrl?: string | null;
   source: string;
   subject: Subject;
   indicator?: Indicator;
@@ -202,11 +203,22 @@ interface QuestionMeta {
 interface Exam {
   id: string;
   title: string;
+  description?: string | null;
   status: string;
   isAdaptive: boolean;
+  questionCount?: number;
+  essayQuestionCount?: number | null;
+  questionTypeCounts?: Record<string, number> | null;
   durationMinutes?: number;
   classroom: { id: string; name: string };
   subject: { id: string; name: string };
+  items?: Array<{
+    id: string;
+    questionId: string;
+    position: number;
+    score: string | number;
+    question: Question;
+  }>;
   _count: { items: number; attempts: number };
 }
 
@@ -699,6 +711,7 @@ const questionImportExample = {
   questions: [
     {
       prompt: "ข้อใดมีค่าเท่ากับ 1/2",
+      imageUrl: "https://example.com/images/fraction-question.png",
       options: [
         { id: "A", text: "2/3" },
         { id: "B", text: "2/4" },
@@ -726,13 +739,84 @@ const questionImportExample = {
   ],
 };
 
+function questionImportExampleForType(type: string) {
+  if (type === "TRUE_FALSE") {
+    return {
+      questions: [
+        {
+          prompt: "น้ำเดือดที่ระดับน้ำทะเลมีอุณหภูมิ 100 องศาเซลเซียส",
+          imageUrl: "https://example.com/images/boiling-water.jpg",
+          options: [
+            { id: "A", text: "ถูก" },
+            { id: "B", text: "ผิด" },
+          ],
+          answerKey: { correctOptionId: "A" },
+          explanation: "จุดเดือดของน้ำที่ระดับน้ำทะเลคือ 100 องศาเซลเซียส",
+          maxScore: 1,
+        },
+      ],
+    };
+  }
+  if (type === "SHORT_ANSWER") {
+    return {
+      questions: [
+        {
+          prompt: "ดาวเคราะห์ดวงใดอยู่ใกล้ดวงอาทิตย์ที่สุด",
+          imageUrl: "https://example.com/images/solar-system.jpg",
+          answerKey: { acceptedAnswers: ["ดาวพุธ", "พุธ"] },
+          explanation: "ดาวพุธเป็นดาวเคราะห์ที่อยู่ใกล้ดวงอาทิตย์ที่สุด",
+          maxScore: 1,
+        },
+      ],
+    };
+  }
+  if (type === "ESSAY") {
+    return {
+      questions: [
+        {
+          prompt: "อธิบายสาเหตุและผลกระทบของภาวะโลกร้อน",
+          imageUrl: "https://example.com/images/global-warming.jpg",
+          answerKey: {
+            rubric:
+              "กล่าวถึงก๊าซเรือนกระจก สาเหตุ และผลกระทบอย่างน้อย 2 ประเด็น",
+          },
+          explanation: "พิจารณาความครบถ้วนและเหตุผลของคำตอบ",
+          maxScore: 5,
+        },
+      ],
+    };
+  }
+  if (type === "FILL_IN_BLANK") {
+    return {
+      questions: [
+        {
+          prompt: "กรุงเทพมหานครเป็นเมืองหลวงของ_____",
+          imageUrl: "https://example.com/images/thailand-map.jpg",
+          answerKey: { acceptedAnswers: ["ประเทศไทย", "ไทย"] },
+          explanation: "กรุงเทพมหานครเป็นเมืองหลวงของประเทศไทย",
+          maxScore: 1,
+        },
+      ],
+    };
+  }
+  return questionImportExample;
+}
+
 const studentImportExample = [
-  ["student_code", "first_name", "last_name", "email", "password", "grade_level"],
+  [
+    "student_code",
+    "first_name",
+    "last_name",
+    "email",
+    "password",
+    "grade_level",
+  ],
   ["STU001", "สมชาย", "ใจดี", "stu001@example.com", "Student123!", "ม.1"],
   ["STU002", "สมหญิง", "เรียนเก่ง", "stu002@example.com", "Student123!", "ม.1"],
 ];
 const studentPageSize = 20;
-type StudentSortKey = "code" | "name" | "grade" | "classroom" | "email" | "status";
+type StudentSortKey =
+  "code" | "name" | "grade" | "classroom" | "email" | "status";
 
 export function AdminApp() {
   const [token, setToken] = useState<string | null>(null);
@@ -805,6 +889,7 @@ export function AdminApp() {
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(
     null,
   );
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [questionDialog, setQuestionDialog] = useState<{
     mode: "view" | "edit" | "create";
     question: Question;
@@ -819,11 +904,21 @@ export function AdminApp() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setToken(sessionStorage.getItem("lab_edu_admin_token"));
+    const savedPage = sessionStorage.getItem("lab_edu_admin_page");
+    if (
+      savedPage &&
+      navigation.some((group) =>
+        group.items.some((item) => item.key === savedPage),
+      )
+    ) {
+      setPage(savedPage as PageKey);
+    }
     setHydrated(true);
   }, []);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("lab_edu_admin_token");
+    sessionStorage.removeItem("lab_edu_admin_page");
     setToken(null);
     setProfile(null);
     setDashboard(null);
@@ -975,12 +1070,28 @@ export function AdminApp() {
               api<Exam[]>("/exams", {}, token),
               api<Classroom[]>("/academic/classrooms", {}, token),
               api<Subject[]>("/academic/subjects", {}, token),
-              api<{ data: Question[] }>("/questions?limit=100", {}, token),
+              api<{ data: Question[] }>("/questions?limit=500", {}, token),
             ]);
-          setExams(examRows);
+          const normalizedExamRows = examRows.map((exam) => ({
+            ...exam,
+            items: exam.items ?? [],
+            questionCount: exam.questionCount ?? exam._count?.items ?? 1,
+          }));
+          setExams(normalizedExamRows);
           setClassrooms(classRows);
           setSubjects(subjectRows);
-          setQuestions(questionResult.data);
+          setQuestions(
+            Array.from(
+              new Map(
+                [
+                  ...questionResult.data,
+                  ...normalizedExamRows.flatMap((exam) =>
+                    (exam.items ?? []).map((item) => item.question),
+                  ),
+                ].map((question) => [question.id, question]),
+              ).values(),
+            ),
+          );
         } else if (target === "assignments") {
           const [assignmentRows, classRows, subjectRows, scale, statusData] =
             await Promise.all([
@@ -1055,6 +1166,9 @@ export function AdminApp() {
     if (token) void loadPage(page);
   }, [page, token]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (hydrated) sessionStorage.setItem("lab_edu_admin_page", page);
+  }, [hydrated, page]);
+  useEffect(() => {
     if (!token || page !== "exam-locks") return;
     const timer = window.setInterval(() => {
       void api<LockedAttempt[]>("/exams/locked-attempts", {}, token)
@@ -1068,16 +1182,17 @@ export function AdminApp() {
   const filteredStudents = useMemo(() => {
     if (!studentClassroomId) return [];
     const keyword = search.trim().toLocaleLowerCase("th-TH");
-    return students.filter((student) =>
-      student.enrollments.some(
-        (enrollment) => enrollment.classroom.id === studentClassroomId,
-      ) &&
-      (!studentStatusFilter ||
-        (studentStatusFilter === "ACTIVE") === student.user.isActive) &&
-      (!keyword ||
-        `${student.studentCode} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
-          .toLocaleLowerCase("th-TH")
-          .includes(keyword)),
+    return students.filter(
+      (student) =>
+        student.enrollments.some(
+          (enrollment) => enrollment.classroom.id === studentClassroomId,
+        ) &&
+        (!studentStatusFilter ||
+          (studentStatusFilter === "ACTIVE") === student.user.isActive) &&
+        (!keyword ||
+          `${student.studentCode} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
+            .toLocaleLowerCase("th-TH")
+            .includes(keyword)),
     );
   }, [search, studentClassroomId, studentStatusFilter, students]);
 
@@ -1088,7 +1203,10 @@ export function AdminApp() {
     try {
       const result = await api<{ accessToken: string }>(
         "/auth/login",
-        jsonBody({ identifier: form.get("identifier"), password: form.get("password") }),
+        jsonBody({
+          identifier: form.get("identifier"),
+          password: form.get("password"),
+        }),
       );
       sessionStorage.setItem("lab_edu_admin_token", result.accessToken);
       setToken(result.accessToken);
@@ -1204,17 +1322,77 @@ export function AdminApp() {
         const selected = data.getAll("questionIds").map(String);
         if (!selected.length)
           throw new Error("กรุณาเลือกข้อสอบอย่างน้อย 1 ข้อ");
+        const questionCount = Number(data.get("questionCount"));
+        const selectedQuestions = questions.filter((question) =>
+          selected.includes(question.id),
+        );
+        const selectedEssayCount = selectedQuestions.filter(
+          (question) => question.type === "ESSAY",
+        ).length;
+        const questionTypeCounts = Object.fromEntries(
+          Object.keys(questionTypeLabel).map((questionType) => [
+            questionType,
+            Number(data.get(`typeCount_${questionType}`)) || 0,
+          ]),
+        );
+        const configuredTotal = Object.values(questionTypeCounts).reduce(
+          (sum, count) => sum + count,
+          0,
+        );
+        if (configuredTotal !== questionCount)
+          throw new Error(
+            `ผลรวมจำนวนข้อแต่ละประเภทต้องเท่ากับ ${questionCount} ข้อ`,
+          );
+        for (const [questionType, count] of Object.entries(
+          questionTypeCounts,
+        )) {
+          const available = selectedQuestions.filter(
+            (question) => question.type === questionType,
+          ).length;
+          if (count > available)
+            throw new Error(
+              `${questionTypeLabel[questionType]} มีในคลัง ${available} ข้อ แต่ตั้งให้ทำ ${count} ข้อ`,
+            );
+        }
+        const essayQuestionCount =
+          questionTypeCounts.ESSAY > 0 &&
+          questionTypeCounts.ESSAY < selectedEssayCount
+            ? questionTypeCounts.ESSAY
+            : null;
+        if (questionCount > selected.length)
+          throw new Error("จำนวนข้อที่ใช้จริงต้องไม่เกินข้อสอบในคลังที่เลือก");
+        if (data.get("isAdaptive") === "on" && selected.length <= questionCount)
+          throw new Error(
+            "Adaptive Test ต้องมีข้อสอบในคลังมากกว่าจำนวนข้อที่ใช้จริง",
+          );
         await api(
-          "/exams",
-          jsonBody({
-            title: data.get("title"),
-            classroomId: data.get("classroomId"),
-            subjectId: data.get("subjectId"),
-            durationMinutes: Number(data.get("durationMinutes")) || undefined,
-            maxAttempts: 1,
-            isAdaptive: data.get("isAdaptive") === "on",
-            items: selected.map((questionId) => ({ questionId, score: 1 })),
-          }),
+          editingExam ? `/exams/${editingExam.id}` : "/exams",
+          {
+            ...jsonBody({
+              title: data.get("title"),
+              description: String(data.get("description") ?? ""),
+              classroomId: data.get("classroomId"),
+              ...(editingExam
+                ? {}
+                : { classroomIds: data.getAll("classroomIds").map(String) }),
+              subjectId: data.get("subjectId"),
+              durationMinutes: Number(data.get("durationMinutes")) || undefined,
+              maxAttempts: 1,
+              isAdaptive: data.get("isAdaptive") === "on",
+              questionCount,
+              essayQuestionCount,
+              questionTypeCounts,
+              items: selected.map((questionId) => ({
+                questionId,
+                score: Number(
+                  selectedQuestions.find(
+                    (question) => question.id === questionId,
+                  )?.maxScore ?? 1,
+                ),
+              })),
+            }),
+            method: editingExam ? "PATCH" : "POST",
+          },
           token,
         );
       } else if (kind === "assignment") {
@@ -1295,6 +1473,7 @@ export function AdminApp() {
       setEditingSubject(null);
       setEditingIndicator(null);
       setEditingAssignment(null);
+      setEditingExam(null);
       setEditingOrganization(null);
       await Swal.fire({
         icon: "success",
@@ -1540,10 +1719,16 @@ export function AdminApp() {
   };
 
   const downloadStudentImportExample = () => {
-    const csv = "\uFEFF" + studentImportExample
-      .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","))
-      .join("\r\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const csv =
+      "\uFEFF" +
+      studentImportExample
+        .map((row) =>
+          row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(","),
+        )
+        .join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
     const link = document.createElement("a");
     link.href = url;
     link.download = "lab-edu-student-import-example.csv";
@@ -1624,6 +1809,36 @@ export function AdminApp() {
       await Swal.fire({
         icon: "success",
         title: willOpen ? "เปิดชุดข้อสอบแล้ว" : "ปิดชุดข้อสอบแล้ว",
+        timer: 1100,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    }
+  };
+
+  const deleteExam = async (exam: Exam) => {
+    if (!token) return;
+    const answer = await Swal.fire({
+      icon: "warning",
+      title: "ลบชุดข้อสอบนี้?",
+      html: exam._count.attempts
+        ? `<b>${exam.title}</b> และประวัติการทำข้อสอบ/คะแนนของนักเรียน <b>${exam._count.attempts} รายการ</b> จะถูกลบถาวร<br><br>ข้อสอบในธนาคารจะยังอยู่`
+        : `${exam.title} จะถูกลบถาวร แต่ข้อสอบในธนาคารจะยังอยู่`,
+      showCancelButton: true,
+      confirmButtonText: exam._count.attempts
+        ? "ลบชุดสอบและประวัติคะแนน"
+        : "ลบชุดข้อสอบ",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#d65b65",
+    });
+    if (!answer.isConfirmed) return;
+    try {
+      await api(`/exams/${exam.id}`, { method: "DELETE" }, token);
+      await loadPage("exams", true);
+      await Swal.fire({
+        icon: "success",
+        title: "ลบชุดข้อสอบแล้ว",
         timer: 1100,
         showConfirmButton: false,
       });
@@ -1714,9 +1929,11 @@ export function AdminApp() {
       preConfirm: () => {
         const popup = Swal.getPopup();
         const gradingMode = isGroup
-          ? ((popup?.querySelector(
-              'input[name="grading-mode"]:checked',
-            ) as HTMLInputElement)?.value as "SHARED" | "INDIVIDUAL")
+          ? ((
+              popup?.querySelector(
+                'input[name="grading-mode"]:checked',
+              ) as HTMLInputElement
+            )?.value as "SHARED" | "INDIVIDUAL")
           : undefined;
         const score = Number(
           (popup?.querySelector("#assignment-score") as HTMLInputElement)
@@ -1757,8 +1974,7 @@ export function AdminApp() {
           score: gradingMode === "INDIVIDUAL" ? 0 : score,
           feedback,
           gradingMode,
-          memberScores:
-            gradingMode === "INDIVIDUAL" ? memberScores : undefined,
+          memberScores: gradingMode === "INDIVIDUAL" ? memberScores : undefined,
         };
       },
     });
@@ -1813,7 +2029,8 @@ export function AdminApp() {
             .forEach((field) => {
               field.classList.toggle(
                 "is-hidden",
-                Boolean(query) && !field.textContent?.toLocaleLowerCase().includes(query),
+                Boolean(query) &&
+                  !field.textContent?.toLocaleLowerCase().includes(query),
               );
             });
         });
@@ -1821,9 +2038,7 @@ export function AdminApp() {
           ?.querySelector("#fill-classroom-scores")
           ?.addEventListener("click", () => {
             const shared = (
-              popup.querySelector(
-                "#classroom-shared-score",
-              ) as HTMLInputElement
+              popup.querySelector("#classroom-shared-score") as HTMLInputElement
             ).value;
             popup
               .querySelectorAll<HTMLInputElement>("[data-class-score]")
@@ -1832,7 +2047,9 @@ export function AdminApp() {
               });
           });
         if (selectedStudentId) {
-          const selected = popup?.querySelector(".swal-class-score.is-selected");
+          const selected = popup?.querySelector(
+            ".swal-class-score.is-selected",
+          );
           selected?.scrollIntoView({ block: "center" });
           selected?.querySelector("input")?.focus();
         }
@@ -2649,6 +2866,19 @@ export function AdminApp() {
             <ExamsView
               rows={exams}
               onToggleAvailability={toggleExamAvailability}
+              onEdit={(exam) => {
+                if (exam._count.attempts) {
+                  void Swal.fire({
+                    icon: "info",
+                    title: "แก้ไขชุดข้อสอบนี้ไม่ได้",
+                    text: "ชุดข้อสอบมีผู้เข้าสอบแล้ว เพื่อไม่ให้ผลคะแนนคลาดเคลื่อน กรุณาสร้างชุดใหม่แทน",
+                  });
+                  return;
+                }
+                setEditingExam(exam);
+                setModal("exam");
+              }}
+              onDelete={deleteExam}
             />
           )}
           {!loading && page === "assignments" && (
@@ -2736,6 +2966,7 @@ export function AdminApp() {
           editingSubject={editingSubject}
           editingIndicator={editingIndicator}
           editingAssignment={editingAssignment}
+          editingExam={editingExam}
           editingOrganization={editingOrganization}
           aiStatus={aiStatus}
           onClose={() => {
@@ -2745,6 +2976,7 @@ export function AdminApp() {
             setEditingSubject(null);
             setEditingIndicator(null);
             setEditingAssignment(null);
+            setEditingExam(null);
             setEditingOrganization(null);
           }}
           onSubmit={(data) => void submitModal(modal, data)}
@@ -3177,7 +3409,10 @@ function StudentsView({
   const [sortKey, setSortKey] = useState<StudentSortKey>("code");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const sortedRows = useMemo(() => {
-    const collator = new Intl.Collator("th-TH", { numeric: true, sensitivity: "base" });
+    const collator = new Intl.Collator("th-TH", {
+      numeric: true,
+      sensitivity: "base",
+    });
     const valueFor = (student: Student) => {
       switch (sortKey) {
         case "name":
@@ -3185,7 +3420,9 @@ function StudentsView({
         case "grade":
           return student.gradeLevel || "";
         case "classroom":
-          return student.enrollments.map((item) => item.classroom.name).join(", ");
+          return student.enrollments
+            .map((item) => item.classroom.name)
+            .join(", ");
         case "email":
           return student.user.email;
         case "status":
@@ -3194,9 +3431,10 @@ function StudentsView({
           return student.studentCode;
       }
     };
-    return [...rows].sort((left, right) =>
-      collator.compare(valueFor(left), valueFor(right)) *
-      (sortDirection === "asc" ? 1 : -1),
+    return [...rows].sort(
+      (left, right) =>
+        collator.compare(valueFor(left), valueFor(right)) *
+        (sortDirection === "asc" ? 1 : -1),
     );
   }, [rows, sortDirection, sortKey]);
   const changeSort = (key: StudentSortKey) => {
@@ -3211,21 +3449,36 @@ function StudentsView({
   const sortableHeader = (label: string, key: StudentSortKey) => {
     const isActive = sortKey === key;
     return (
-      <th aria-sort={isActive ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+      <th
+        aria-sort={
+          isActive
+            ? sortDirection === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
+        }
+      >
         <button
           type="button"
           className={`table-sort${isActive ? " active" : ""}`}
           onClick={() => changeSort(key)}
         >
           {label}
-          {isActive && (sortDirection === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}
+          {isActive &&
+            (sortDirection === "asc" ? (
+              <ChevronUp size={13} />
+            ) : (
+              <ChevronDown size={13} />
+            ))}
         </button>
       </th>
     );
   };
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / studentPageSize));
   const currentPage = Math.min(page, pageCount);
-  const pageStart = sortedRows.length ? (currentPage - 1) * studentPageSize + 1 : 0;
+  const pageStart = sortedRows.length
+    ? (currentPage - 1) * studentPageSize + 1
+    : 0;
   const pageEnd = Math.min(currentPage * studentPageSize, sortedRows.length);
   const pageRows = sortedRows.slice(pageStart - 1, pageEnd);
   const visiblePages = Array.from(
@@ -3239,9 +3492,7 @@ function StudentsView({
   return (
     <section className="panel full-panel">
       <PanelHeader
-        title={
-          selectedClassroomId ? `นักเรียน ${rows.length} คน` : "นักเรียน"
-        }
+        title={selectedClassroomId ? `นักเรียน ${rows.length} คน` : "นักเรียน"}
         subtitle="เลือกห้องเรียนก่อนเพื่อดูรายชื่อนักเรียน"
       />
       <div className="student-filters">
@@ -3276,103 +3527,104 @@ function StudentsView({
         <EmptyState title="เลือกห้องเรียนเพื่อแสดงรายชื่อนักเรียน" />
       ) : (
         <>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              {sortableHeader("รหัส", "code")}
-              {sortableHeader("ชื่อ–นามสกุล", "name")}
-              {sortableHeader("ระดับชั้น", "grade")}
-              {sortableHeader("ห้องเรียน", "classroom")}
-              {sortableHeader("อีเมล", "email")}
-              {sortableHeader("สถานะ", "status")}
-              <th>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length ? (
-              pageRows.map((student) => (
-                <tr key={student.id}>
-                  <td>
-                    <span className="code-chip">{student.studentCode}</span>
-                  </td>
-                  <td>
-                    <div className="person-cell">
-                      <Avatar name={student.user.firstName} />
-                      <strong>
-                        {student.user.firstName} {student.user.lastName}
-                      </strong>
-                    </div>
-                  </td>
-                  <td>{student.gradeLevel || "—"}</td>
-                  <td>
-                    {student.enrollments
-                      .map((e) => e.classroom.name)
-                      .join(", ") || "ยังไม่เข้าห้อง"}
-                  </td>
-                  <td>{student.user.email}</td>
-                  <td>
-                    <StatusBadge
-                      status={student.user.isActive ? "ACTIVE" : "INACTIVE"}
-                    />
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        onClick={() => onEdit(student)}
-                        title="แก้ไขนักเรียน"
-                      >
-                        <PencilLine />
-                      </button>
-                      <button
-                        className="delete-action"
-                        onClick={() => void onDelete(student)}
-                        title="ลบนักเรียน"
-                      >
-                        <Trash2 />
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {sortableHeader("รหัส", "code")}
+                  {sortableHeader("ชื่อ–นามสกุล", "name")}
+                  {sortableHeader("ระดับชั้น", "grade")}
+                  {sortableHeader("ห้องเรียน", "classroom")}
+                  {sortableHeader("อีเมล", "email")}
+                  {sortableHeader("สถานะ", "status")}
+                  <th>จัดการ</th>
                 </tr>
-              ))
-            ) : (
-              <TableEmpty colSpan={7} />
-            )}
-          </tbody>
-        </table>
-      </div>
-      <footer className="pagination">
-        <span>
-          แสดง {pageStart.toLocaleString("th-TH")}–
-          {pageEnd.toLocaleString("th-TH")} จาก {sortedRows.length.toLocaleString("th-TH")} คน
-        </span>
-        <div>
-          <button
-            type="button"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage <= 1}
-          >
-            ‹
-          </button>
-          {visiblePages.map((pageNumber) => (
-            <button
-              type="button"
-              className={pageNumber === currentPage ? "active" : ""}
-              onClick={() => onPageChange(pageNumber)}
-              key={pageNumber}
-            >
-              {pageNumber}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage >= pageCount}
-          >
-            ›
-          </button>
-        </div>
-      </footer>
+              </thead>
+              <tbody>
+                {pageRows.length ? (
+                  pageRows.map((student) => (
+                    <tr key={student.id}>
+                      <td>
+                        <span className="code-chip">{student.studentCode}</span>
+                      </td>
+                      <td>
+                        <div className="person-cell">
+                          <Avatar name={student.user.firstName} />
+                          <strong>
+                            {student.user.firstName} {student.user.lastName}
+                          </strong>
+                        </div>
+                      </td>
+                      <td>{student.gradeLevel || "—"}</td>
+                      <td>
+                        {student.enrollments
+                          .map((e) => e.classroom.name)
+                          .join(", ") || "ยังไม่เข้าห้อง"}
+                      </td>
+                      <td>{student.user.email}</td>
+                      <td>
+                        <StatusBadge
+                          status={student.user.isActive ? "ACTIVE" : "INACTIVE"}
+                        />
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            onClick={() => onEdit(student)}
+                            title="แก้ไขนักเรียน"
+                          >
+                            <PencilLine />
+                          </button>
+                          <button
+                            className="delete-action"
+                            onClick={() => void onDelete(student)}
+                            title="ลบนักเรียน"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <TableEmpty colSpan={7} />
+                )}
+              </tbody>
+            </table>
+          </div>
+          <footer className="pagination">
+            <span>
+              แสดง {pageStart.toLocaleString("th-TH")}–
+              {pageEnd.toLocaleString("th-TH")} จาก{" "}
+              {sortedRows.length.toLocaleString("th-TH")} คน
+            </span>
+            <div>
+              <button
+                type="button"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+              >
+                ‹
+              </button>
+              {visiblePages.map((pageNumber) => (
+                <button
+                  type="button"
+                  className={pageNumber === currentPage ? "active" : ""}
+                  onClick={() => onPageChange(pageNumber)}
+                  key={pageNumber}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage >= pageCount}
+              >
+                ›
+              </button>
+            </div>
+          </footer>
         </>
       )}
     </section>
@@ -3949,15 +4201,19 @@ function QuestionsView({
 function ExamsView({
   rows,
   onToggleAvailability,
+  onEdit,
+  onDelete,
 }: {
   rows: Exam[];
   onToggleAvailability: (exam: Exam) => void;
+  onEdit: (exam: Exam) => void;
+  onDelete: (exam: Exam) => void;
 }) {
   return (
     <section className="panel full-panel">
       <PanelHeader
         title={`ชุดข้อสอบ ${rows.length} ชุด`}
-        subtitle="เปิด–ปิดการเข้าสอบและติดตามจำนวนผู้เข้าสอบ"
+        subtitle="กำหนดคลังข้อสอบ จำนวนที่ใช้จริง และเปิด–ปิดการเข้าสอบ"
       />
       <div className="table-wrap">
         <table>
@@ -3966,10 +4222,12 @@ function ExamsView({
               <th>ชื่อชุดข้อสอบ</th>
               <th>วิชา / ห้อง</th>
               <th>รูปแบบ</th>
-              <th>จำนวนข้อ</th>
+              <th>คลัง / ใช้จริง</th>
+              <th>สัดส่วนประเภท</th>
               <th>ผู้เข้าสอบ</th>
               <th>สถานะ</th>
               <th>เปิดให้นักเรียนสอบ</th>
+              <th>จัดการ</th>
             </tr>
           </thead>
           <tbody>
@@ -3999,10 +4257,55 @@ function ExamsView({
                         "ทั่วไป"
                       )}
                     </td>
-                    <td>{exam._count.items}</td>
+                    <td>
+                      <strong>
+                        {exam._count.items} /{" "}
+                        {exam.questionCount ?? exam._count.items}
+                      </strong>
+                      <span>ข้อในคลัง / ข้อที่ทำ</span>
+                    </td>
+                    <td>
+                      {exam.questionTypeCounts
+                        ? Object.entries(exam.questionTypeCounts)
+                            .filter(([, count]) => count > 0)
+                            .map(
+                              ([questionType, count]) =>
+                                `${questionTypeLabel[questionType] ?? questionType} ${count}`,
+                            )
+                            .join(" · ")
+                        : "ใช้การตั้งค่าเดิม"}
+                    </td>
                     <td>{exam._count.attempts}</td>
                     <td>
                       <StatusBadge status={exam.status} />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="icon-button"
+                          type="button"
+                          title={
+                            exam._count.attempts
+                              ? "มีผู้เข้าสอบแล้ว"
+                              : "แก้ไขชุดข้อสอบ"
+                          }
+                          onClick={() => onEdit(exam)}
+                        >
+                          <PencilLine size={15} />
+                        </button>
+                        <button
+                          className="delete-action"
+                          type="button"
+                          title={
+                            exam._count.attempts
+                              ? "ลบชุดสอบและประวัติคะแนน"
+                              : "ลบชุดข้อสอบ"
+                          }
+                          onClick={() => void onDelete(exam)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                     <td>
                       {exam.status === "ARCHIVED" ? (
@@ -4025,7 +4328,7 @@ function ExamsView({
                 );
               })
             ) : (
-              <TableEmpty colSpan={7} />
+              <TableEmpty colSpan={9} />
             )}
           </tbody>
         </table>
@@ -4124,7 +4427,11 @@ function AssignmentsView({
             ดีเยี่ยม ≥ 80% · ดี ≥ 70% · พอใช้ ≥ 60% · ปรับปรุง &lt; 60%
           </span>
         </div>
-        <button className="button secondary" title={`เกณฑ์เกรดรายวิชา ${Object.entries(gradeScale).length} ระดับ`} onClick={() => void onEditScale()}>
+        <button
+          className="button secondary"
+          title={`เกณฑ์เกรดรายวิชา ${Object.entries(gradeScale).length} ระดับ`}
+          onClick={() => void onEditScale()}
+        >
           <PencilLine size={15} /> เกณฑ์เกรดรายวิชา
         </button>
       </section>
@@ -4255,7 +4562,9 @@ function AssignmentsView({
               </div>
               <div className="assignment-count">
                 <b>{assignment._count.submissions}</b>
-                <span>{assignment.isGroupWork ? "กลุ่มส่งแล้ว" : "ส่งแล้ว"}</span>
+                <span>
+                  {assignment.isGroupWork ? "กลุ่มส่งแล้ว" : "ส่งแล้ว"}
+                </span>
               </div>
             </summary>
             <div className="assignment-detail">
@@ -4302,227 +4611,227 @@ function AssignmentsView({
                     {assignment.isGroupWork ? (
                       assignment.submissions.length ? (
                         assignment.submissions.map((submission) => (
-                        <tr key={submission.id}>
-                          <td>
-                            {assignment.isGroupWork ? (
-                              <div className="submission-group">
-                                <strong>
-                                  <Users size={14} /> กลุ่ม {submission.groupName}
-                                </strong>
-                                {(submission.members ?? []).map((member) => (
-                                  <span key={member.studentId}>
-                                    {member.student.user.firstName}{" "}
-                                    {member.student.user.lastName} · {member.role}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <>
-                                <strong>
-                                  {submission.student.user.firstName}{" "}
-                                  {submission.student.user.lastName}
-                                </strong>
-                                <span>{submission.student.studentCode}</span>
-                              </>
-                            )}
-                          </td>
-                          <td>
-                            {date(submission.submittedAt)}
-                            {new Date(submission.submittedAt) >
-                              new Date(assignment.dueAt) && (
-                              <span className="late-label">ส่งช้า</span>
-                            )}
-                          </td>
-                          <td>
-                            {assignment.type === "CODE" &&
-                            submission.content ? (
-                              <button
-                                className="code-read-button"
-                                onClick={() =>
-                                  void showCodeSubmission(
-                                    assignment,
-                                    submission,
-                                  )
-                                }
-                              >
-                                <Eye /> อ่าน Source Code
-                              </button>
-                            ) : submission.content ? (
-                              <span>{submission.content}</span>
-                            ) : null}
-                            {(submission.attachmentUrls?.length
-                              ? submission.attachmentUrls
-                              : submission.attachmentUrl
-                                ? [submission.attachmentUrl]
-                                : []
-                            ).map((url, index) => (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer"
-                                key={url}
-                              >
-                                เปิดลิงก์งาน {index + 1}
-                              </a>
-                            ))}
-                          </td>
-                          <td>
-                            {submission.gradingMode === "INDIVIDUAL" ? (
-                              <div className="individual-scores">
-                                <b>คะแนนรายคน</b>
-                                {(submission.members ?? []).map((member) => (
-                                  <span key={member.studentId}>
-                                    {member.student.user.firstName}: {member.score == null ? "-" : Number(member.score)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <strong>
-                                {submission.score == null
-                                  ? "ยังไม่ตรวจ"
-                                  : `${Number(submission.score)}/${Number(assignment.maxScore)}`}
-                              </strong>
-                            )}
-                            {submission.assessment && (
-                              <span className="grade-chip">
-                                {submission.assessment}
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            {assignment.type === "CODE" &&
-                              submission.content && (
+                          <tr key={submission.id}>
+                            <td>
+                              {assignment.isGroupWork ? (
+                                <div className="submission-group">
+                                  <strong>
+                                    <Users size={14} /> กลุ่ม{" "}
+                                    {submission.groupName}
+                                  </strong>
+                                  {(submission.members ?? []).map((member) => (
+                                    <span key={member.studentId}>
+                                      {member.student.user.firstName}{" "}
+                                      {member.student.user.lastName} ·{" "}
+                                      {member.role}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  <strong>
+                                    {submission.student.user.firstName}{" "}
+                                    {submission.student.user.lastName}
+                                  </strong>
+                                  <span>{submission.student.studentCode}</span>
+                                </>
+                              )}
+                            </td>
+                            <td>
+                              {date(submission.submittedAt)}
+                              {new Date(submission.submittedAt) >
+                                new Date(assignment.dueAt) && (
+                                <span className="late-label">ส่งช้า</span>
+                              )}
+                            </td>
+                            <td>
+                              {assignment.type === "CODE" &&
+                              submission.content ? (
                                 <button
-                                  className="button secondary compact-button"
+                                  className="code-read-button"
                                   onClick={() =>
-                                    onRunCode(assignment, submission)
+                                    void showCodeSubmission(
+                                      assignment,
+                                      submission,
+                                    )
                                   }
                                 >
-                                  รันโค้ด
+                                  <Eye /> อ่าน Source Code
                                 </button>
+                              ) : submission.content ? (
+                                <span>{submission.content}</span>
+                              ) : null}
+                              {(submission.attachmentUrls?.length
+                                ? submission.attachmentUrls
+                                : submission.attachmentUrl
+                                  ? [submission.attachmentUrl]
+                                  : []
+                              ).map((url, index) => (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  key={url}
+                                >
+                                  เปิดลิงก์งาน {index + 1}
+                                </a>
+                              ))}
+                            </td>
+                            <td>
+                              {submission.gradingMode === "INDIVIDUAL" ? (
+                                <div className="individual-scores">
+                                  <b>คะแนนรายคน</b>
+                                  {(submission.members ?? []).map((member) => (
+                                    <span key={member.studentId}>
+                                      {member.student.user.firstName}:{" "}
+                                      {member.score == null
+                                        ? "-"
+                                        : Number(member.score)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <strong>
+                                  {submission.score == null
+                                    ? "ยังไม่ตรวจ"
+                                    : `${Number(submission.score)}/${Number(assignment.maxScore)}`}
+                                </strong>
                               )}
-                            <button
-                              className="button secondary compact-button"
-                              onClick={() =>
-                                void onGrade(assignment, submission)
-                              }
-                            >
-                              ให้คะแนน
-                            </button>
-                          </td>
-                        </tr>
+                              {submission.assessment && (
+                                <span className="grade-chip">
+                                  {submission.assessment}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {assignment.type === "CODE" &&
+                                submission.content && (
+                                  <button
+                                    className="button secondary compact-button"
+                                    onClick={() =>
+                                      onRunCode(assignment, submission)
+                                    }
+                                  >
+                                    รันโค้ด
+                                  </button>
+                                )}
+                              <button
+                                className="button secondary compact-button"
+                                onClick={() =>
+                                  void onGrade(assignment, submission)
+                                }
+                              >
+                                ให้คะแนน
+                              </button>
+                            </td>
+                          </tr>
                         ))
                       ) : (
                         <TableEmpty colSpan={5} />
                       )
-                    ) : (
-                      assignment.students.length ? (
-                        assignment.students.map((student) => {
-                          const submission = assignment.submissions.find(
-                            (item) => item.student.id === student.id,
-                          );
-                          const hasWork = Boolean(
-                            submission?.content ||
-                              submission?.attachmentUrl ||
-                              submission?.attachmentUrls?.length,
-                          );
-                          return (
-                            <tr key={student.id}>
-                              <td>
-                                <strong>
-                                  {student.user.firstName} {student.user.lastName}
-                                </strong>
-                                <span>{student.studentCode}</span>
-                              </td>
-                              <td>
-                                {hasWork && submission
-                                  ? date(submission.submittedAt)
-                                  : "—"}
-                                {!hasWork && (
-                                  <span className="not-submitted-label">
-                                    ยังไม่ส่งในระบบ
-                                  </span>
-                                )}
-                              </td>
-                              <td>
-                                {assignment.type === "CODE" &&
-                                submission?.content ? (
-                                  <button
-                                    className="code-read-button"
-                                    onClick={() =>
-                                      void showCodeSubmission(
-                                        assignment,
-                                        submission,
-                                      )
-                                    }
-                                  >
-                                    <Eye /> อ่าน Source Code
-                                  </button>
-                                ) : submission?.content ? (
-                                  <span>{submission.content}</span>
-                                ) : (
-                                  <span className="muted-cell">
-                                    รับงานนอกระบบได้
-                                  </span>
-                                )}
-                                {(submission?.attachmentUrls?.length
-                                  ? submission.attachmentUrls
-                                  : submission?.attachmentUrl
-                                    ? [submission.attachmentUrl]
-                                    : []
-                                ).map((url, index) => (
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    key={url}
-                                  >
-                                    เปิดลิงก์งาน {index + 1}
-                                  </a>
-                                ))}
-                              </td>
-                              <td>
-                                <strong>
-                                  {submission?.score == null
-                                    ? "ยังไม่ให้คะแนน"
-                                    : `${Number(submission.score)}/${Number(assignment.maxScore)}`}
-                                </strong>
-                                {submission?.assessment && (
-                                  <span className="grade-chip">
-                                    {submission.assessment}
-                                  </span>
-                                )}
-                              </td>
-                              <td>
-                                {assignment.type === "CODE" &&
-                                  submission?.content && (
-                                    <button
-                                      className="button secondary compact-button"
-                                      onClick={() =>
-                                        onRunCode(assignment, submission)
-                                      }
-                                    >
-                                      รันโค้ด
-                                    </button>
-                                  )}
+                    ) : assignment.students.length ? (
+                      assignment.students.map((student) => {
+                        const submission = assignment.submissions.find(
+                          (item) => item.student.id === student.id,
+                        );
+                        const hasWork = Boolean(
+                          submission?.content ||
+                          submission?.attachmentUrl ||
+                          submission?.attachmentUrls?.length,
+                        );
+                        return (
+                          <tr key={student.id}>
+                            <td>
+                              <strong>
+                                {student.user.firstName} {student.user.lastName}
+                              </strong>
+                              <span>{student.studentCode}</span>
+                            </td>
+                            <td>
+                              {hasWork && submission
+                                ? date(submission.submittedAt)
+                                : "—"}
+                              {!hasWork && (
+                                <span className="not-submitted-label">
+                                  ยังไม่ส่งในระบบ
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {assignment.type === "CODE" &&
+                              submission?.content ? (
                                 <button
-                                  className="button secondary compact-button"
+                                  className="code-read-button"
                                   onClick={() =>
-                                    void onGradeClassroom(
+                                    void showCodeSubmission(
                                       assignment,
-                                      student.id,
+                                      submission,
                                     )
                                   }
                                 >
-                                  ให้คะแนน
+                                  <Eye /> อ่าน Source Code
                                 </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <TableEmpty colSpan={5} />
-                      )
+                              ) : submission?.content ? (
+                                <span>{submission.content}</span>
+                              ) : (
+                                <span className="muted-cell">
+                                  รับงานนอกระบบได้
+                                </span>
+                              )}
+                              {(submission?.attachmentUrls?.length
+                                ? submission.attachmentUrls
+                                : submission?.attachmentUrl
+                                  ? [submission.attachmentUrl]
+                                  : []
+                              ).map((url, index) => (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  key={url}
+                                >
+                                  เปิดลิงก์งาน {index + 1}
+                                </a>
+                              ))}
+                            </td>
+                            <td>
+                              <strong>
+                                {submission?.score == null
+                                  ? "ยังไม่ให้คะแนน"
+                                  : `${Number(submission.score)}/${Number(assignment.maxScore)}`}
+                              </strong>
+                              {submission?.assessment && (
+                                <span className="grade-chip">
+                                  {submission.assessment}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {assignment.type === "CODE" &&
+                                submission?.content && (
+                                  <button
+                                    className="button secondary compact-button"
+                                    onClick={() =>
+                                      onRunCode(assignment, submission)
+                                    }
+                                  >
+                                    รันโค้ด
+                                  </button>
+                                )}
+                              <button
+                                className="button secondary compact-button"
+                                onClick={() =>
+                                  void onGradeClassroom(assignment, student.id)
+                                }
+                              >
+                                ให้คะแนน
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <TableEmpty colSpan={5} />
                     )}
                   </tbody>
                 </table>
@@ -4612,7 +4921,11 @@ function LegacyAssignmentsView({
             ดีเยี่ยม ≥ 80% · ดี ≥ 70% · พอใช้ ≥ 60% · ปรับปรุง &lt; 60%
           </span>
         </div>
-        <button className="button secondary" title={`เกณฑ์เกรดรายวิชา ${Object.entries(gradeScale).length} ระดับ`} onClick={() => void onEditScale()}>
+        <button
+          className="button secondary"
+          title={`เกณฑ์เกรดรายวิชา ${Object.entries(gradeScale).length} ระดับ`}
+          onClick={() => void onEditScale()}
+        >
           <PencilLine size={15} /> เกณฑ์เกรดรายวิชา
         </button>
       </section>
@@ -5789,6 +6102,15 @@ function escapeHtml(value: string) {
   );
 }
 
+function questionImagePreviewUrl(value: string) {
+  const driveMatch = value.match(
+    /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/,
+  );
+  return driveMatch
+    ? `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`
+    : value;
+}
+
 function codeLanguageLabel(language?: Assignment["codeLanguage"]) {
   return language === "CPP"
     ? "C++"
@@ -6002,7 +6324,9 @@ function SettingsView({
                 <Code2 />
                 <span>
                   <strong>หน้า Playground</strong>
-                  <small>ให้นักเรียนทดลองเขียนและรันโค้ด C++, C# และ Python</small>
+                  <small>
+                    ให้นักเรียนทดลองเขียนและรันโค้ด C++, C# และ Python
+                  </small>
                 </span>
               </div>
               <button
@@ -6022,7 +6346,9 @@ function SettingsView({
                 <Bot />
                 <span>
                   <strong>AI สำหรับผู้เรียน</strong>
-                  <small>คำแนะนำรายข้อ รายงานการเรียนรู้ และคำแนะนำโค้ดใน Playground</small>
+                  <small>
+                    คำแนะนำรายข้อ รายงานการเรียนรู้ และคำแนะนำโค้ดใน Playground
+                  </small>
                 </span>
               </div>
               <button
@@ -6104,6 +6430,7 @@ function QuestionImportDialog({
   const [difficulty, setDifficulty] = useState("MEDIUM");
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedSubject = subjects.find((subject) => subject.id === subjectId);
+  const example = useMemo(() => questionImportExampleForType(type), [type]);
   const validation = useMemo(
     () => validateQuestionImportJson(text, type),
     [text, type],
@@ -6118,13 +6445,13 @@ function QuestionImportDialog({
     }
   };
   const downloadExample = () => {
-    const blob = new Blob([JSON.stringify(questionImportExample, null, 2)], {
+    const blob = new Blob([JSON.stringify(example, null, 2)], {
       type: "application/json;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "lab-edu-questions-example.json";
+    link.download = `lab-edu-questions-${type.toLowerCase()}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -6190,7 +6517,17 @@ function QuestionImportDialog({
               ประเภทข้อสอบ
               <select
                 value={type}
-                onChange={(event) => setType(event.target.value)}
+                onChange={(event) => {
+                  const nextType = event.target.value;
+                  setType(nextType);
+                  setText(
+                    JSON.stringify(
+                      questionImportExampleForType(nextType),
+                      null,
+                      2,
+                    ),
+                  );
+                }}
               >
                 {Object.entries(questionTypeLabel).map(([value, label]) => (
                   <option value={value} key={value}>
@@ -6231,9 +6568,7 @@ function QuestionImportDialog({
             <button
               className="button secondary"
               type="button"
-              onClick={() =>
-                setText(JSON.stringify(questionImportExample, null, 2))
-              }
+              onClick={() => setText(JSON.stringify(example, null, 2))}
             >
               <FileQuestion size={16} /> เติมข้อมูลตัวอย่าง
             </button>
@@ -6364,6 +6699,19 @@ function validateQuestionImportJson(
             message: `ข้อที่ ${index + 1}: ไม่พบ ${field}`,
           };
       }
+      if (question.imageUrl !== undefined) {
+        try {
+          const imageUrl = new URL(String(question.imageUrl));
+          if (!["http:", "https:"].includes(imageUrl.protocol))
+            throw new Error();
+        } catch {
+          return {
+            valid: false,
+            count: 0,
+            message: `ข้อที่ ${index + 1}: imageUrl ต้องเป็นลิงก์ http หรือ https`,
+          };
+        }
+      }
       if (
         !question.answerKey ||
         typeof question.answerKey !== "object" ||
@@ -6435,6 +6783,8 @@ function QuestionDialog({
   const [type, setType] = useState(question.type);
   const [difficulty, setDifficulty] = useState(question.difficulty);
   const [prompt, setPrompt] = useState(question.prompt);
+  const [imageUrl, setImageUrl] = useState(question.imageUrl ?? "");
+  const [imagePreviewError, setImagePreviewError] = useState(false);
   const [options, setOptions] =
     useState<Array<{ id: string; text: string }>>(initialOptions);
   const [correctOptionId, setCorrectOptionId] = useState(
@@ -6503,6 +6853,7 @@ function QuestionDialog({
       type,
       difficulty,
       prompt,
+      imageUrl: imageUrl.trim() || null,
       options: isChoice ? cleanOptions : [],
       answerKey: isChoice
         ? { correctOptionId }
@@ -6551,6 +6902,24 @@ function QuestionDialog({
               <label>คำถาม</label>
               <h3>{question.prompt}</h3>
             </section>
+            {question.imageUrl && (
+              <section className="question-block">
+                <label>รูปประกอบคำถาม</label>
+                <a
+                  className="question-image-preview"
+                  href={question.imageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={questionImagePreviewUrl(question.imageUrl)}
+                    alt={`รูปประกอบ: ${question.prompt}`}
+                    referrerPolicy="no-referrer"
+                  />
+                </a>
+              </section>
+            )}
             {initialOptions.length > 0 && (
               <section className="question-block">
                 <label>ตัวเลือก</label>
@@ -6711,6 +7080,39 @@ function QuestionDialog({
                 required
               />
             </label>
+            <label className="form-field">
+              ลิงก์รูปประกอบคำถาม (ไม่บังคับ)
+              <input
+                type="url"
+                value={imageUrl}
+                maxLength={2048}
+                placeholder="https://example.com/question-image.jpg"
+                onChange={(event) => {
+                  setImageUrl(event.target.value);
+                  setImagePreviewError(false);
+                }}
+              />
+              <small className="field-hint">
+                ใช้ลิงก์รูปภาพแบบสาธารณะ หรือ Google Drive
+                ที่เปิดสิทธิ์ทุกคนที่มีลิงก์
+              </small>
+            </label>
+            {imageUrl.trim() && !imagePreviewError && (
+              <div className="question-image-preview edit-preview">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={questionImagePreviewUrl(imageUrl)}
+                  alt="ตัวอย่างรูปประกอบคำถาม"
+                  referrerPolicy="no-referrer"
+                  onError={() => setImagePreviewError(true)}
+                />
+              </div>
+            )}
+            {imageUrl.trim() && imagePreviewError && (
+              <div className="image-preview-error">
+                ไม่สามารถแสดงตัวอย่างได้ กรุณาตรวจสอบว่าลิงก์เปิดแบบสาธารณะ
+              </div>
+            )}
             {isChoice && (
               <div className="option-editor">
                 <label>ตัวเลือกและเฉลย</label>
@@ -6848,6 +7250,7 @@ function DataModal({
   editingSubject,
   editingIndicator,
   editingAssignment,
+  editingExam,
   editingOrganization,
   aiStatus,
   onClose,
@@ -6865,12 +7268,55 @@ function DataModal({
   editingSubject: Subject | null;
   editingIndicator: Indicator | null;
   editingAssignment: Assignment | null;
+  editingExam: Exam | null;
   editingOrganization: Organization | null;
   aiStatus: AiStatusData | null;
   onClose: () => void;
   onSubmit: (data: FormData) => void;
 }) {
-  const [examSubjectId, setExamSubjectId] = useState(subjects[0]?.id ?? "");
+  const [examSubjectId, setExamSubjectId] = useState(
+    editingExam?.subject.id ?? subjects[0]?.id ?? "",
+  );
+  const [examAdaptive, setExamAdaptive] = useState(
+    editingExam?.isAdaptive ?? false,
+  );
+  const [examQuestionCount, setExamQuestionCount] = useState(
+    editingExam?.questionCount ?? editingExam?._count.items ?? 1,
+  );
+  const [examTypeCounts, setExamTypeCounts] = useState<Record<string, number>>(
+    () => {
+      const counts = Object.fromEntries(
+        Object.keys(questionTypeLabel).map((questionType) => [questionType, 0]),
+      );
+      if (editingExam?.questionTypeCounts)
+        return { ...counts, ...editingExam.questionTypeCounts };
+      if (!editingExam) return { ...counts, MULTIPLE_CHOICE: 1 };
+      let remaining = editingExam.questionCount ?? editingExam._count.items;
+      const items = editingExam.items ?? [];
+      const essayAvailable = items.filter(
+        (item) => item.question.type === "ESSAY",
+      ).length;
+      const essayTarget = Math.min(
+        editingExam.essayQuestionCount ?? essayAvailable,
+        remaining,
+      );
+      counts.ESSAY = essayTarget;
+      remaining -= essayTarget;
+      for (const questionType of Object.keys(questionTypeLabel).filter(
+        (value) => value !== "ESSAY",
+      )) {
+        const available = items.filter(
+          (item) => item.question.type === questionType,
+        ).length;
+        counts[questionType] = Math.min(available, remaining);
+        remaining -= counts[questionType];
+      }
+      return counts;
+    },
+  );
+  const [examQuestionIds, setExamQuestionIds] = useState<Set<string>>(
+    new Set(editingExam?.items?.map((item) => item.questionId) ?? []),
+  );
   const [generateSubjectId, setGenerateSubjectId] = useState(
     subjects[0]?.id ?? "",
   );
@@ -6900,7 +7346,7 @@ function DataModal({
     subject: editingSubject ? "แก้ไขรายวิชา" : "เพิ่มรายวิชา",
     indicator: editingIndicator ? "แก้ไขตัวชี้วัด" : "เพิ่มตัวชี้วัด",
     generate: "สร้างข้อสอบด้วย AI",
-    exam: "สร้างชุดข้อสอบ",
+    exam: editingExam ? "แก้ไขชุดข้อสอบ" : "สร้างชุดข้อสอบ",
     assignment: editingAssignment ? "แก้ไขงาน" : "เพิ่มงาน",
     organization: editingOrganization ? "แก้ไของค์กร" : "เพิ่มองค์กร",
   };
@@ -7185,22 +7631,65 @@ function DataModal({
             )}
             {kind === "exam" && (
               <>
-                <Field label="ชื่อชุดข้อสอบ" name="title" required />
-                <div className="field-row">
-                  <SelectField
-                    label="ห้องเรียน"
-                    name="classroomId"
-                    options={classrooms.map((room) => ({
-                      value: room.id,
-                      label: room.name,
-                    }))}
+                <Field
+                  label="ชื่อชุดข้อสอบ"
+                  name="title"
+                  defaultValue={editingExam?.title}
+                  required
+                />
+                <label className="form-field">
+                  คำอธิบาย (ไม่บังคับ)
+                  <textarea
+                    name="description"
+                    rows={2}
+                    defaultValue={editingExam?.description ?? ""}
                   />
+                </label>
+                <div className="field-row">
+                  {editingExam ? (
+                    <SelectField
+                      label="ห้องเรียน"
+                      name="classroomId"
+                      options={classrooms.map((room) => ({
+                        value: room.id,
+                        label: room.name,
+                      }))}
+                      defaultValue={editingExam.classroom.id}
+                    />
+                  ) : (
+                    <label className="form-field">
+                      ห้องเรียน (เลือกได้หลายห้อง)
+                      <select name="classroomIds" multiple size={4} required>
+                        {classrooms.map((room) => (
+                          <option value={room.id} key={room.id}>
+                            {room.name}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="field-hint">
+                        กด Ctrl/⌘ ค้างไว้เพื่อเลือกหลายห้องในครั้งเดียว
+                      </small>
+                    </label>
+                  )}
                   <label className="form-field">
                     รายวิชา
                     <select
                       name="subjectId"
                       value={examSubjectId}
-                      onChange={(event) => setExamSubjectId(event.target.value)}
+                      onChange={(event) => {
+                        setExamSubjectId(event.target.value);
+                        setExamQuestionIds(new Set());
+                        setExamTypeCounts(
+                          Object.fromEntries(
+                            Object.keys(questionTypeLabel).map(
+                              (questionType) => [
+                                questionType,
+                                questionType === "MULTIPLE_CHOICE" ? 1 : 0,
+                              ],
+                            ),
+                          ),
+                        );
+                      }}
                       required
                     >
                       {subjects.map((subject) => (
@@ -7215,19 +7704,162 @@ function DataModal({
                   label="เวลาสอบ (นาที)"
                   name="durationMinutes"
                   type="number"
-                  defaultValue="60"
+                  defaultValue={editingExam?.durationMinutes ?? 60}
                   min={1}
                   max={1440}
                 />
                 <label className="toggle-line">
-                  <input type="checkbox" name="isAdaptive" />
+                  <input
+                    type="checkbox"
+                    name="isAdaptive"
+                    checked={examAdaptive}
+                    onChange={(event) => setExamAdaptive(event.target.checked)}
+                  />
                   <span>
                     <b>เปิด Adaptive Test</b>
-                    <small>ปรับระดับความยากตามคำตอบของนักเรียน</small>
+                    <small>
+                      ปรับระดับความยากตามคำตอบ
+                      และต้องมีข้อในคลังมากกว่าจำนวนที่ใช้จริง
+                    </small>
                   </span>
                 </label>
+                <div className="exam-config-grid">
+                  <Field
+                    label="จำนวนข้อที่นักเรียนต้องทำจริง"
+                    name="questionCount"
+                    type="number"
+                    min={1}
+                    max={Math.max(1, examQuestionIds.size)}
+                    value={examQuestionCount}
+                    onChange={(event) =>
+                      setExamQuestionCount(Number(event.target.value))
+                    }
+                    required
+                  />
+                </div>
+                <div className="exam-type-ratios">
+                  <div className="exam-type-ratios-heading">
+                    <div>
+                      <b>สัดส่วนประเภทข้อสอบที่ให้นักเรียนทำ</b>
+                      <small>
+                        กำหนดเป็นจำนวนข้อ ระบบจะแสดงเปอร์เซ็นต์ให้อัตโนมัติ
+                      </small>
+                    </div>
+                    <span
+                      className={
+                        Object.values(examTypeCounts).reduce(
+                          (sum, count) => sum + count,
+                          0,
+                        ) === examQuestionCount
+                          ? "valid"
+                          : "invalid"
+                      }
+                    >
+                      รวม{" "}
+                      {Object.values(examTypeCounts).reduce(
+                        (sum, count) => sum + count,
+                        0,
+                      )}{" "}
+                      / {examQuestionCount || 0} ข้อ
+                    </span>
+                  </div>
+                  <div className="exam-type-ratio-grid">
+                    {Object.entries(questionTypeLabel).map(
+                      ([questionType, label]) => {
+                        const available = questions.filter(
+                          (question) =>
+                            examQuestionIds.has(question.id) &&
+                            question.type === questionType,
+                        ).length;
+                        const count = examTypeCounts[questionType] ?? 0;
+                        const percentage = examQuestionCount
+                          ? Math.round((count / examQuestionCount) * 100)
+                          : 0;
+                        return (
+                          <label key={questionType}>
+                            <span>
+                              <b>{label}</b>
+                              <small>
+                                คลัง {available} ข้อ · {percentage}%
+                              </small>
+                            </span>
+                            <input
+                              name={`typeCount_${questionType}`}
+                              type="number"
+                              min={0}
+                              max={available}
+                              value={count}
+                              onChange={(event) =>
+                                setExamTypeCounts((current) => ({
+                                  ...current,
+                                  [questionType]: Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  ),
+                                }))
+                              }
+                              required
+                            />
+                          </label>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={`exam-pool-summary ${examAdaptive && examQuestionIds.size <= examQuestionCount ? "warning" : ""}`}
+                >
+                  <span>
+                    เลือกไว้ <b>{examQuestionIds.size}</b> ข้อ
+                  </span>
+                  <span>
+                    ใช้จริง <b>{examQuestionCount || 0}</b> ข้อ
+                  </span>
+                  <span>
+                    อัตนัยในคลัง{" "}
+                    <b>
+                      {
+                        questions.filter(
+                          (question) =>
+                            examQuestionIds.has(question.id) &&
+                            question.type === "ESSAY",
+                        ).length
+                      }
+                    </b>{" "}
+                    ข้อ
+                  </span>
+                  {examAdaptive &&
+                    examQuestionIds.size <= examQuestionCount && (
+                      <small>
+                        Adaptive Test ต้องเลือกข้อสอบสำรองเพิ่มอย่างน้อย 1 ข้อ
+                      </small>
+                    )}
+                </div>
                 <div className="question-picker">
-                  <label>เลือกข้อสอบ</label>
+                  <div className="question-picker-heading">
+                    <label>เลือกข้อสอบเข้าคลังของชุดนี้</label>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => {
+                        const visible = questions.filter(
+                          (question) => question.subject.id === examSubjectId,
+                        );
+                        setExamQuestionIds((current) =>
+                          current.size === visible.length
+                            ? new Set()
+                            : new Set(visible.map((question) => question.id)),
+                        );
+                      }}
+                    >
+                      {examQuestionIds.size ===
+                      questions.filter(
+                        (question) => question.subject.id === examSubjectId,
+                      ).length
+                        ? "ยกเลิกทั้งหมด"
+                        : "เลือกทั้งหมด"}
+                    </button>
+                  </div>
                   {questions
                     .filter((question) => question.subject.id === examSubjectId)
                     .map((question) => (
@@ -7236,6 +7868,15 @@ function DataModal({
                           type="checkbox"
                           name="questionIds"
                           value={question.id}
+                          checked={examQuestionIds.has(question.id)}
+                          onChange={(event) => {
+                            setExamQuestionIds((current) => {
+                              const next = new Set(current);
+                              if (event.target.checked) next.add(question.id);
+                              else next.delete(question.id);
+                              return next;
+                            });
+                          }}
                         />
                         <span>
                           <b>{question.prompt}</b>
@@ -7316,7 +7957,8 @@ function DataModal({
                   <span>
                     <b>งานกลุ่ม</b>
                     <small>
-                      นักเรียนตั้งชื่อกลุ่ม เลือกเพื่อนในห้องเดียวกัน และระบุหน้าที่สมาชิกได้
+                      นักเรียนตั้งชื่อกลุ่ม เลือกเพื่อนในห้องเดียวกัน
+                      และระบุหน้าที่สมาชิกได้
                     </small>
                   </span>
                 </label>
@@ -7365,7 +8007,8 @@ function DataModal({
                         placeholder="https://drive.google.com/file/d/.../view"
                       />
                       <small className="field-hint">
-                        ตั้งค่าการแชร์ไฟล์เป็น “ทุกคนที่มีลิงก์” เพื่อให้นักเรียนเปิดดูได้
+                        ตั้งค่าการแชร์ไฟล์เป็น “ทุกคนที่มีลิงก์”
+                        เพื่อให้นักเรียนเปิดดูได้
                       </small>
                     </label>
                     <label className="toggle-line">
