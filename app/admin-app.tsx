@@ -6203,6 +6203,9 @@ function SettingsView({
   onToggleStudentAi: () => void;
   onTogglePlayground: () => void;
 }) {
+  const canManageStudentFeatures =
+    profile?.role === "ADMIN" || profile?.role === "SUPER_ADMIN";
+
   if (isTeacher)
     return (
       <div className="settings-grid teacher-settings">
@@ -6332,7 +6335,7 @@ function SettingsView({
           title="การเชื่อมต่อ AI"
           subtitle="กำหนดการใช้งาน AI ของผู้เรียนและตรวจสอบผู้ให้บริการ"
         />
-        {profile?.role === "ADMIN" && (
+        {canManageStudentFeatures && (
           <>
             <div className="student-ai-control">
               <div>

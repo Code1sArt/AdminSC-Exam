@@ -50,6 +50,10 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /\/ai\/status/);
   assert.match(app, /\/ai\/student-access/);
   assert.match(app, /AI สำหรับผู้เรียน/);
+  assert.match(
+    app,
+    /profile\?\.role === "ADMIN" \|\| profile\?\.role === "SUPER_ADMIN"/,
+  );
   assert.match(app, /`\/academic\/subjects\/\$\{editingSubject\.id\}`/);
   assert.match(app, /`\/academic\/indicators\/\$\{editingIndicator\.id\}`/);
   assert.match(app, /ลบตัวชี้วัด/);
