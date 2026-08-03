@@ -48,6 +48,7 @@ import {
 } from "react";
 import Swal from "sweetalert2";
 import { ApiError, api, jsonBody } from "../lib/api";
+import { PlaygroundProblemsView } from "./components/playground-problems-view";
 
 type PageKey =
   | "dashboard"
@@ -56,6 +57,7 @@ type PageKey =
   | "classrooms"
   | "subjects"
   | "questions"
+  | "playground-problems"
   | "exams"
   | "assignments"
   | "grades"
@@ -536,6 +538,12 @@ const navigation: Array<{
         icon: BookOpen,
         roles: ["ADMIN", "TEACHER"],
       },
+      {
+        key: "playground-problems",
+        label: "โจทย์ Playground",
+        icon: Code2,
+        roles: ["ADMIN"],
+      },
     ],
   },
   {
@@ -611,6 +619,10 @@ const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
     subtitle: "กำหนดโครงสร้างเนื้อหาเพื่อสร้างข้อสอบอย่างแม่นยำ",
   },
   questions: { title: "ธนาคารข้อสอบ", subtitle: "สร้างและจัดการข้อสอบด้วย AI" },
+  "playground-problems": {
+    title: "โจทย์ Playground",
+    subtitle: "จัดโจทย์ฝึกเขียนโปรแกรมตามระดับจาก Google Drive",
+  },
   exams: {
     title: "ชุดข้อสอบออนไลน์",
     subtitle: "เผยแพร่และติดตามการสอบแบบปรับระดับ",
@@ -2758,14 +2770,14 @@ export function AdminApp() {
               </label>
             )}
             <div className="action-spacer" />
-            <button
+            {page !== "playground-problems" && <button
               className="button secondary refresh-button"
               onClick={() => void loadPage(page, true)}
               disabled={refreshing}
             >
               <RefreshCw size={17} className={refreshing ? "spin" : ""} />{" "}
               รีเฟรช
-            </button>
+            </button>}
             <PageActions
               page={page}
               setModal={setModal}
@@ -2861,6 +2873,9 @@ export function AdminApp() {
               onOpen={openQuestion}
               onDelete={deleteQuestions}
             />
+          )}
+          {!loading && page === "playground-problems" && token && (
+            <PlaygroundProblemsView token={token} />
           )}
           {!loading && page === "exams" && (
             <ExamsView

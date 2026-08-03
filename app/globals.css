@@ -4079,3 +4079,72 @@ td span {
   font-size: 10px;
   line-height: 1.6;
 }
+
+/* Playground problem management lives in its own component. */
+.playground-problems-admin { display: grid; gap: 18px; }
+.playground-problem-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px; }
+.playground-problem-intro > div:first-child { display: flex; align-items: center; gap: 14px; }
+.playground-problem-intro h3 { margin: 0; color: #243a35; font-size: 15px; }
+.playground-problem-intro p { margin: 4px 0 0; color: #788b84; font-size: 11px; }
+.playground-problem-icon { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 12px; background: #e1f3eb; color: #1b775d; }
+.playground-problem-icon svg { width: 21px; }
+.playground-problem-actions { display: flex; gap: 9px; }
+.playground-level-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.playground-level { overflow: hidden; }
+.playground-level > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 17px; border-bottom: 1px solid #e7eeeb; }
+.playground-level > header > div { display: flex; align-items: center; gap: 10px; }
+.playground-level > header > div > span { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; font-size: 11px; font-weight: 800; }
+.playground-level > header h3 { margin: 0; color: #30423d; font-size: 13px; }
+.playground-level > header p { margin: 3px 0 0; color: #8b9a95; font-size: 9px; }
+.playground-level > header > b { white-space: nowrap; border-radius: 20px; background: #f1f5f3; padding: 5px 8px; color: #71817c; font-size: 9px; }
+.level-easy > header > div > span { background: #ddf3e9; color: #187252; }
+.level-medium > header > div > span { background: #fff0cf; color: #91630a; }
+.level-hard > header > div > span { background: #ffe2e2; color: #aa4048; }
+.playground-problem-list { display: grid; gap: 0; }
+.playground-problem-list article { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; padding: 14px; border-bottom: 1px solid #edf2f0; }
+.playground-problem-list article:last-child { border-bottom: 0; }
+.playground-problem-list article.inactive { opacity: .62; background: #f8faf9; }
+.playground-problem-order { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: #f0f5f3; color: #789087; font-size: 9px; font-weight: 800; }
+.playground-problem-copy { min-width: 0; }
+.playground-problem-copy > div { display: flex; align-items: center; gap: 6px; }
+.playground-problem-copy h4 { overflow: hidden; margin: 0; color: #30423d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.playground-problem-copy > div span { border-radius: 10px; background: #e9eeec; padding: 2px 5px; color: #7d8884; font-size: 8px; }
+.playground-problem-copy p { display: -webkit-box; overflow: hidden; margin: 5px 0; color: #83928d; font-size: 9px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.playground-problem-copy a { display: inline-flex; align-items: center; gap: 4px; color: #26775f; font-size: 8px; text-decoration: none; }
+.playground-problem-row-actions { display: flex; gap: 3px; }
+.playground-problem-row-actions button, .playground-problem-modal header > button, .playground-preview-modal header > button { display: grid; width: 29px; height: 29px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #71817c; cursor: pointer; }
+.playground-problem-row-actions button:hover { background: #e9f4ef; color: #1d755b; }
+.playground-problem-row-actions button.danger:hover { background: #fff0f0; color: #bd4c55; }
+.playground-empty, .playground-problem-loading { display: grid; min-height: 180px; place-content: center; justify-items: center; color: #94a19d; text-align: center; }
+.playground-empty svg { width: 28px; }
+.playground-empty p { margin: 8px 0 4px; font-size: 10px; }
+.playground-empty button { border: 0; background: transparent; color: #23785e; font-size: 9px; font-weight: 800; cursor: pointer; }
+.playground-problem-loading { display: flex; gap: 9px; min-height: 260px; font-size: 11px; }
+.playground-modal-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(20, 34, 30, .58); backdrop-filter: blur(4px); }
+.playground-problem-modal, .playground-preview-modal { overflow: hidden; width: min(620px, 100%); max-height: calc(100vh - 40px); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(19, 36, 31, .3); }
+.playground-problem-modal > header, .playground-preview-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding: 20px 22px; border-bottom: 1px solid #e5ece9; }
+.playground-problem-modal h2, .playground-preview-modal h2 { margin: 0; color: #263c36; font-size: 16px; }
+.playground-problem-modal header p { margin: 5px 0 0; color: #7f908a; font-size: 10px; }
+.playground-problem-form { display: grid; gap: 14px; overflow: auto; max-height: calc(100vh - 190px); padding: 20px 22px; }
+.playground-problem-form > label, .playground-problem-form .field-row > label { display: grid; gap: 7px; color: #52655f; font-size: 10px; font-weight: 700; }
+.playground-problem-form input, .playground-problem-form textarea, .playground-problem-form select { width: 100%; border: 1px solid #d8e4df; border-radius: 9px; background: #fff; padding: 10px 11px; color: #2f443e; font: inherit; font-weight: 500; outline: 0; }
+.playground-problem-form input:focus, .playground-problem-form textarea:focus, .playground-problem-form select:focus { border-color: #55a68d; box-shadow: 0 0 0 3px rgba(58, 146, 118, .1); }
+.playground-problem-form small { color: #91a09b; font-size: 8px; font-weight: 500; }
+.drive-url-field { position: relative; }
+.drive-url-field svg { position: absolute; top: 11px; left: 10px; width: 15px; color: #7c9089; }
+.drive-url-field input { padding-left: 33px; }
+.playground-active-check { display: flex !important; align-items: center; gap: 9px !important; padding: 11px; border-radius: 10px; background: #f3f8f6; }
+.playground-active-check input { width: 16px; accent-color: #238568; }
+.playground-active-check span { display: grid; gap: 2px; }
+.playground-problem-modal > footer, .playground-preview-modal > footer { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 14px 22px; border-top: 1px solid #e5ece9; background: #f8faf9; }
+.playground-preview-modal { width: min(940px, 100%); }
+.playground-preview-modal header > div { display: flex; align-items: center; gap: 10px; }
+.playground-preview-modal iframe { display: block; width: 100%; height: min(68vh, 680px); border: 0; background: #edf1ef; }
+.playground-preview-modal footer { justify-content: space-between; }
+.playground-preview-modal footer > span { color: #81918b; font-size: 9px; }
+.playground-level-badge { border-radius: 14px; padding: 5px 9px; font-size: 9px; font-weight: 800; }
+.playground-level-badge.easy { background: #ddf3e9; color: #187252; }
+.playground-level-badge.medium { background: #fff0cf; color: #91630a; }
+.playground-level-badge.hard { background: #ffe2e2; color: #aa4048; }
+@media (max-width: 1100px) { .playground-level-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .playground-problem-intro { align-items: stretch; flex-direction: column; } .playground-problem-actions { display: grid; grid-template-columns: 1fr 1fr; } .playground-problem-list article { grid-template-columns: 28px minmax(0, 1fr); } .playground-problem-row-actions { grid-column: 2; } .playground-preview-modal footer > span { display: none; } }
