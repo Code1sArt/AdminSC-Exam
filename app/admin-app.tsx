@@ -49,6 +49,7 @@ import {
 import Swal from "sweetalert2";
 import { ApiError, api, jsonBody } from "../lib/api";
 import { PlaygroundProblemsView } from "./components/playground-problems-view";
+import { CodingTestsView } from "./components/coding-tests-view";
 
 type PageKey =
   | "dashboard"
@@ -58,6 +59,7 @@ type PageKey =
   | "subjects"
   | "questions"
   | "playground-problems"
+  | "coding-tests"
   | "exams"
   | "assignments"
   | "grades"
@@ -561,6 +563,7 @@ const navigation: Array<{
         icon: ClipboardCheck,
         roles: ["ADMIN", "TEACHER"],
       },
+      { key: "coding-tests", label: "Coding Test", icon: Code2, roles: ["ADMIN", "TEACHER"] },
       {
         key: "assignments",
         label: "งานและการให้คะแนน",
@@ -627,6 +630,7 @@ const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
     title: "ชุดข้อสอบออนไลน์",
     subtitle: "เผยแพร่และติดตามการสอบแบบปรับระดับ",
   },
+  "coding-tests": { title: "Coding Test", subtitle: "จัดสอบเขียนโค้ด เลือกโจทย์ และตรวจคะแนนผ่านคิว AI" },
   assignments: {
     title: "งานและการให้คะแนน",
     subtitle: "มอบหมายงาน รับงาน และตัดเกรดนักเรียน",
@@ -681,6 +685,7 @@ const teacherPageTitles: Partial<
     title: "ชุดข้อสอบของฉัน",
     subtitle: "สร้าง เผยแพร่ และติดตามการสอบของคุณ",
   },
+  "coding-tests": { title: "Coding Test ของฉัน", subtitle: "สร้างและควบคุมการสอบเขียนโค้ดของนักเรียน" },
   assignments: {
     title: "งานของฉัน",
     subtitle: "สร้างงาน ตรวจงาน และให้คะแนนนักเรียน",
@@ -1097,6 +1102,10 @@ export function AdminApp() {
           // to a question that has since been deactivated, and the exams API
           // correctly rejects such a question when a new exam is saved.
           setQuestions(questionResult.data);
+        } else if (target === "coding-tests") {
+          const [classRows, subjectRows] = await Promise.all([api<Classroom[]>("/academic/classrooms", {}, token), api<Subject[]>("/academic/subjects", {}, token)]);
+          setClassrooms(classRows);
+          setSubjects(subjectRows);
         } else if (target === "assignments") {
           const [assignmentRows, classRows, subjectRows, scale, statusData] =
             await Promise.all([
@@ -2870,6 +2879,7 @@ export function AdminApp() {
           {!loading && page === "playground-problems" && token && (
             <PlaygroundProblemsView token={token} />
           )}
+          {!loading && page === "coding-tests" && token && <CodingTestsView token={token} classrooms={classrooms} subjects={subjects} />}
           {!loading && page === "exams" && (
             <ExamsView
               rows={exams}
