@@ -1092,18 +1092,11 @@ export function AdminApp() {
           setExams(normalizedExamRows);
           setClassrooms(classRows);
           setSubjects(subjectRows);
-          setQuestions(
-            Array.from(
-              new Map(
-                [
-                  ...questionResult.data,
-                  ...normalizedExamRows.flatMap((exam) =>
-                    (exam.items ?? []).map((item) => item.question),
-                  ),
-                ].map((question) => [question.id, question]),
-              ).values(),
-            ),
-          );
+          // The questions endpoint only returns active questions. Do not merge
+          // historical exam items into this selectable pool: an item can refer
+          // to a question that has since been deactivated, and the exams API
+          // correctly rejects such a question when a new exam is saved.
+          setQuestions(questionResult.data);
         } else if (target === "assignments") {
           const [assignmentRows, classRows, subjectRows, scale, statusData] =
             await Promise.all([

@@ -36,6 +36,11 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /\/auth\/login/);
   assert.match(app, /\/analytics\/dashboard/);
   assert.match(app, /\/questions\/generate/);
+  assert.match(app, /setQuestions\(questionResult\.data\)/);
+  assert.doesNotMatch(
+    app,
+    /normalizedExamRows\.flatMap\(\(exam\)\s*=>\s*\(exam\.items/,
+  );
   assert.match(app, /`\/questions\/\$\{question\.id\}`/);
   assert.match(app, /แก้ไขข้อสอบและเฉลย/);
   assert.match(app, /ลบที่เลือก/);
