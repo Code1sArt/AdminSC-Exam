@@ -6955,7 +6955,9 @@ function QuestionDialog({
                       key={option.id}
                     >
                       <b>{option.id}</b>
-                      <span>{option.text}</span>
+                      <span style={{ whiteSpace: "pre-wrap" }}>
+                        {option.text}
+                      </span>
                       {String(initialKey.correctOptionId) === option.id && (
                         <small>คำตอบที่ถูก</small>
                       )}

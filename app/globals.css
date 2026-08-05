@@ -1854,6 +1854,9 @@ td span {
   background: transparent;
   text-align: left;
 }
+.question-link strong {
+  white-space: pre-wrap;
+}
 .question-link:hover strong {
   color: var(--primary);
 }
@@ -2669,6 +2672,7 @@ td span {
 .question-picker b {
   font-size: 10px;
   font-weight: 600;
+  white-space: pre-wrap;
 }
 .question-picker small {
   margin-top: 3px;
@@ -2746,10 +2750,12 @@ td span {
   margin: 0;
   font-size: 15px;
   line-height: 1.75;
+  white-space: pre-wrap;
 }
 .question-block p {
   margin: 0;
   color: #667185;
+  white-space: pre-wrap;
   font-size: 11px;
   white-space: pre-wrap;
 }
