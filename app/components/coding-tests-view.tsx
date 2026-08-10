@@ -65,6 +65,7 @@ interface CodingTest {
   description?: string | null;
   status: string;
   requiredCount: number;
+  fullScore: number | string;
   durationMinutes?: number | null;
   aiGradingEnabled: boolean;
   aiGradingModel?: string | null;
@@ -142,6 +143,7 @@ export function CodingTestsView({
       title: String(form.get("title")),
       description: String(form.get("description")),
       requiredCount: Number(form.get("requiredCount")),
+      fullScore: Number(form.get("fullScore")),
       durationMinutes: Number(form.get("durationMinutes")) || undefined,
       aiGradingEnabled: form.get("aiGradingEnabled") === "on",
       aiGradingModel: String(form.get("aiGradingModel") || "") || undefined,
@@ -345,6 +347,9 @@ export function CodingTestsView({
                   <CheckCircle2 /> ทำขั้นต่ำ {row.requiredCount} ข้อ
                 </span>
                 <span>
+                  <CheckCircle2 /> เต็ม {Number(row.fullScore)} คะแนน
+                </span>
+                <span>
                   <Bot /> {row.aiGradingEnabled ? "AI ตรวจ" : "ครูตรวจ"}
                 </span>
               </div>
@@ -498,6 +503,17 @@ export function CodingTestsView({
                     min={1}
                     max={problems.length}
                     defaultValue={editing?.requiredCount ?? 1}
+                  />
+                </label>
+                <label>
+                  คะแนนเต็มชุดสอบ
+                  <input
+                    name="fullScore"
+                    required
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    defaultValue={editing?.fullScore ?? 10}
                   />
                 </label>
                 <label>
