@@ -56,6 +56,8 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /แก้คะแนน/);
   assert.match(app, /\/result-max-score/);
   assert.match(app, /\/attempts\/\$\{student\.attemptId\}\/score/);
+  assert.match(app, /\/students\/\$\{student\.studentId\}\/score/);
+  assert.match(app, /ยังไม่มีคะแนน/);
   assert.match(app, /กู้คืนผลสอบ/);
   assert.match(app, /\/exams\/reset-attempts/);
   assert.match(app, /`\/exams\/reset-attempts\/\$\{row\.id\}\/restore`/);

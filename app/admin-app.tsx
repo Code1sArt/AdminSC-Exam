@@ -235,7 +235,8 @@ interface ExamAnalysis {
   maxScore: string | number | null;
   distribution: { strong: number; average: number; needsSupport: number };
   students: Array<{
-    attemptId: string;
+    studentId: string;
+    attemptId: string | null;
     studentCode: string;
     name: string;
     score: string | number | null;
@@ -2347,11 +2348,15 @@ export function AdminApp() {
 
     try {
       await api(
-        `/exams/${examId}/attempts/${student.attemptId}/score`,
-        {
-          ...jsonBody({ score: Number(result.value) }),
-          method: "PATCH",
-        },
+        student.attemptId
+          ? `/exams/${examId}/attempts/${student.attemptId}/score`
+          : `/exams/${examId}/students/${student.studentId}/score`,
+        student.attemptId
+          ? {
+              ...jsonBody({ score: Number(result.value) }),
+              method: "PATCH",
+            }
+          : jsonBody({ score: Number(result.value) }),
         token,
       );
       setExamAnalysis(
@@ -2373,7 +2378,7 @@ export function AdminApp() {
     examId: string,
     student: ExamAnalysis["students"][number],
   ) => {
-    if (!token) return;
+    if (!token || !student.attemptId) return;
     const answer = await Swal.fire({
       icon: "warning",
       title: `รีเซ็ตผลสอบของ ${student.name}?`,
@@ -5522,9 +5527,11 @@ function ResultsView({
   ) => void;
   resettingAttemptId: string | null;
 }) {
-  const measured = analysis?.students.length ?? 0;
+  const measuredStudents =
+    analysis?.students.filter((student) => student.percentage != null) ?? [];
+  const measured = measuredStudents.length;
   const average = measured
-    ? analysis!.students.reduce(
+    ? measuredStudents.reduce(
         (sum, student) => sum + Number(student.percentage ?? 0),
         0,
       ) / measured
@@ -5616,10 +5623,11 @@ function ResultsView({
                       const score = Number(student.percentage ?? 0);
                       const rawScore = Number(student.score ?? 0);
                       const maxScore = Number(student.maxScore ?? 0);
+                      const hasResult = student.attemptId !== null;
                       const isResetting =
                         resettingAttemptId === student.attemptId;
                       return (
-                        <tr key={student.attemptId}>
+                        <tr key={student.attemptId ?? student.studentId}>
                           <td>
                             <span className="code-chip">
                               {student.studentCode}
@@ -5629,13 +5637,23 @@ function ResultsView({
                             <strong>{student.name}</strong>
                           </td>
                           <td className="result-score-cell">
-                            <strong>
-                              {rawScore}/{maxScore}
-                            </strong>
-                            <small>{score.toFixed(1)}%</small>
+                            {hasResult ? (
+                              <>
+                                <strong>
+                                  {rawScore}/{maxScore}
+                                </strong>
+                                <small>{score.toFixed(1)}%</small>
+                              </>
+                            ) : (
+                              <span className="no-result-label">
+                                ยังไม่มีคะแนน
+                              </span>
+                            )}
                           </td>
                           <td>
-                            {score >= 80
+                            {!hasResult
+                              ? "—"
+                              : score >= 80
                               ? "เก่ง"
                               : score >= 50
                                 ? "กลาง"
@@ -5652,24 +5670,27 @@ function ResultsView({
                                 disabled={Boolean(resettingAttemptId)}
                                 title="กรอกคะแนนสอบให้นักเรียนโดยตรง"
                               >
-                                <PencilLine /> กรอก/แก้คะแนน
+                                <PencilLine />
+                                {hasResult ? "กรอก/แก้คะแนน" : "ให้คะแนน"}
                               </button>
-                              <button
-                                type="button"
-                                className="reset-result-button"
-                                onClick={() =>
-                                  void onReset(analysis.id, student)
-                                }
-                                disabled={Boolean(resettingAttemptId)}
-                                title="รีเซ็ตผลสอบเพื่อให้นักเรียนสอบใหม่"
-                              >
-                                <RotateCcw
-                                  className={isResetting ? "spin" : ""}
-                                />{" "}
-                                {isResetting
-                                  ? "กำลังรีเซ็ต..."
-                                  : "รีเซ็ตผลสอบ"}
-                              </button>
+                              {hasResult && (
+                                <button
+                                  type="button"
+                                  className="reset-result-button"
+                                  onClick={() =>
+                                    void onReset(analysis.id, student)
+                                  }
+                                  disabled={Boolean(resettingAttemptId)}
+                                  title="รีเซ็ตผลสอบเพื่อให้นักเรียนสอบใหม่"
+                                >
+                                  <RotateCcw
+                                    className={isResetting ? "spin" : ""}
+                                  />{" "}
+                                  {isResetting
+                                    ? "กำลังรีเซ็ต..."
+                                    : "รีเซ็ตผลสอบ"}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
