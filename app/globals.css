@@ -1384,6 +1384,110 @@ td span {
   width: 13px;
   height: 13px;
 }
+.result-panel-header {
+  gap: 16px;
+}
+.edit-max-score-button,
+.edit-result-score-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #b8d9c9;
+  border-radius: 8px;
+  color: #267553;
+  background: #f3faf6;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.edit-max-score-button {
+  min-height: 35px;
+  padding: 0 12px;
+}
+.edit-result-score-button {
+  padding: 7px 10px;
+}
+.edit-max-score-button:hover,
+.edit-result-score-button:hover:not(:disabled) {
+  border-color: #69b28e;
+  background: #e9f7ef;
+}
+.edit-max-score-button svg,
+.edit-result-score-button svg {
+  width: 13px;
+  height: 13px;
+}
+.edit-result-score-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.result-score-cell strong,
+.result-score-cell small {
+  display: block;
+}
+.result-score-cell small {
+  margin-top: 3px;
+  color: #8d98a8;
+  font-size: 9px;
+}
+.result-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.score-recovery-panel {
+  min-height: 420px;
+}
+.restore-result-button {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #a9dcc4;
+  padding: 0 11px;
+  border-radius: 8px;
+  color: #267553;
+  background: #f1faf5;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.restore-result-button:hover:not(:disabled) {
+  border-color: #62b48d;
+  background: #e8f7ef;
+}
+.restore-result-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.restore-result-button svg {
+  width: 14px;
+}
+.score-recovery-empty {
+  min-height: 320px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 30px;
+  text-align: center;
+}
+.score-recovery-empty svg {
+  width: 37px;
+  height: 37px;
+  color: #4b9a76;
+}
+.score-recovery-empty strong {
+  margin-top: 13px;
+  color: #344154;
+  font-size: 13px;
+}
+.score-recovery-empty span {
+  max-width: 380px;
+  margin-top: 5px;
+  color: #919aaa;
+  font-size: 10px;
+  line-height: 1.6;
+}
 .assignment-layout {
   display: grid;
   gap: 14px;

@@ -52,6 +52,13 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /\/analytics\/exams\/\$\{examId\}/);
   assert.match(app, /\/exams\/\$\{examId\}\/attempts\/\$\{student\.attemptId\}/);
   assert.match(app, /รีเซ็ตผลสอบ/);
+  assert.match(app, /แก้คะแนนเต็ม/);
+  assert.match(app, /แก้คะแนน/);
+  assert.match(app, /\/result-max-score/);
+  assert.match(app, /\/attempts\/\$\{student\.attemptId\}\/score/);
+  assert.match(app, /กู้คืนผลสอบ/);
+  assert.match(app, /\/exams\/reset-attempts/);
+  assert.match(app, /`\/exams\/reset-attempts\/\$\{row\.id\}\/restore`/);
   assert.match(app, /\/ai\/status/);
   assert.match(app, /\/ai\/student-access/);
   assert.match(app, /AI สำหรับผู้เรียน/);

@@ -64,6 +64,7 @@ type PageKey =
   | "assignments"
   | "grades"
   | "results"
+  | "score-recovery"
   | "exam-locks"
   | "ai"
   | "organizations"
@@ -231,14 +232,29 @@ interface ExamAnalysis {
   title: string;
   classroom: string;
   subject: string;
+  maxScore: string | number | null;
   distribution: { strong: number; average: number; needsSupport: number };
   students: Array<{
     attemptId: string;
     studentCode: string;
     name: string;
+    score: string | number | null;
+    maxScore: string | number | null;
     percentage: string | number | null;
   }>;
   questions: Array<{ questionId: string; correctRate: number }>;
+}
+
+interface ResetExamResult {
+  id: string;
+  examId: string;
+  studentId: string;
+  resetByName: string;
+  examTitle: string;
+  studentCode: string;
+  studentName: string;
+  attemptCount: number;
+  resetAt: string;
 }
 
 interface AcademicRecords {
@@ -583,6 +599,12 @@ const navigation: Array<{
         roles: ["ADMIN", "TEACHER"],
       },
       {
+        key: "score-recovery",
+        label: "กู้คืนผลสอบ",
+        icon: RotateCcw,
+        roles: ["ADMIN", "TEACHER"],
+      },
+      {
         key: "exam-locks",
         label: "ปลดล็อกการสอบ",
         icon: LockKeyhole,
@@ -643,6 +665,10 @@ const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
     title: "ผลสอบและวิเคราะห์",
     subtitle: "ติดตามคะแนนและกลุ่มผู้เรียนจากการสอบ",
   },
+  "score-recovery": {
+    title: "กู้คืนผลสอบ",
+    subtitle: "กู้คืนคะแนนและคำตอบที่ถูกรีเซ็ตโดยไม่ตั้งใจ",
+  },
   "exam-locks": {
     title: "ปลดล็อกการสอบ",
     subtitle: "ตรวจสอบเหตุการณ์ผิดปกติและอนุญาตให้นักเรียนทำข้อสอบต่อ",
@@ -697,6 +723,10 @@ const teacherPageTitles: Partial<
   results: {
     title: "ผลสอบของนักเรียน",
     subtitle: "วิเคราะห์ผลสอบจากชุดข้อสอบที่คุณสร้าง",
+  },
+  "score-recovery": {
+    title: "กู้คืนผลสอบ",
+    subtitle: "กู้คืนคะแนนและคำตอบในชุดข้อสอบที่คุณดูแล",
   },
   "exam-locks": {
     title: "ปลดล็อกการสอบ",
@@ -883,6 +913,12 @@ export function AdminApp() {
   const [academicRecords, setAcademicRecords] =
     useState<AcademicRecords | null>(null);
   const [resettingAttemptId, setResettingAttemptId] = useState<string | null>(
+    null,
+  );
+  const [resetExamResults, setResetExamResults] = useState<ResetExamResult[]>(
+    [],
+  );
+  const [restoringArchiveId, setRestoringArchiveId] = useState<string | null>(
     null,
   );
   const [lockedAttempts, setLockedAttempts] = useState<LockedAttempt[]>([]);
@@ -1138,6 +1174,10 @@ export function AdminApp() {
           );
         } else if (target === "grades") {
           setAcademicRecords(await api<AcademicRecords>("/records", {}, token));
+        } else if (target === "score-recovery") {
+          setResetExamResults(
+            await api<ResetExamResult[]>("/exams/reset-attempts", {}, token),
+          );
         } else if (target === "exam-locks") {
           setLockedAttempts(
             await api<LockedAttempt[]>("/exams/locked-attempts", {}, token),
@@ -2224,6 +2264,111 @@ export function AdminApp() {
     }
   };
 
+  const editExamMaxScore = async (analysis: ExamAnalysis) => {
+    if (!token) return;
+    const currentMax = Number(
+      analysis.maxScore ?? analysis.students[0]?.maxScore ?? 0,
+    );
+    const result = await Swal.fire({
+      icon: "question",
+      title: "แก้คะแนนเต็มของชุดสอบ",
+      html: `คะแนนเดิมของนักเรียนทุกคนใน <b>${escapeHtml(analysis.title)}</b> จะถูกปรับสเกลโดยคงเปอร์เซ็นต์เดิมไว้`,
+      input: "number",
+      inputValue: currentMax || "",
+      inputLabel: "คะแนนเต็มใหม่",
+      inputAttributes: { min: "0.01", max: "100000", step: "0.01" },
+      showCancelButton: true,
+      confirmButtonText: "บันทึกคะแนนเต็ม",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#2f8b68",
+      inputValidator: (value) => {
+        const maxScore = Number(value);
+        return Number.isFinite(maxScore) && maxScore > 0
+          ? undefined
+          : "กรุณากรอกคะแนนเต็มมากกว่า 0";
+      },
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      await api(
+        `/exams/${analysis.id}/result-max-score`,
+        {
+          ...jsonBody({ maxScore: Number(result.value) }),
+          method: "PATCH",
+        },
+        token,
+      );
+      setExamAnalysis(
+        await api<ExamAnalysis>(
+          `/analytics/exams/${analysis.id}`,
+          {},
+          token,
+        ),
+      );
+      await Swal.fire({
+        icon: "success",
+        title: "แก้คะแนนเต็มแล้ว",
+        text: `คะแนนเต็มใหม่คือ ${Number(result.value)} คะแนน`,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    }
+  };
+
+  const editExamStudentScore = async (
+    examId: string,
+    student: ExamAnalysis["students"][number],
+  ) => {
+    if (!token) return;
+    const maxScore = Number(student.maxScore ?? 0);
+    const result = await Swal.fire({
+      icon: "question",
+      title: `กรอก/แก้คะแนนของ ${student.name}`,
+      html: `รหัสนักเรียน <b>${escapeHtml(student.studentCode)}</b> · คะแนนเต็ม <b>${maxScore}</b>`,
+      input: "number",
+      inputValue: Number(student.score ?? 0),
+      inputLabel: "คะแนนใหม่",
+      inputAttributes: { min: "0", max: String(maxScore), step: "0.01" },
+      showCancelButton: true,
+      confirmButtonText: "บันทึกคะแนน",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#2f8b68",
+      inputValidator: (value) => {
+        const score = Number(value);
+        return Number.isFinite(score) && score >= 0 && score <= maxScore
+          ? undefined
+          : `คะแนนต้องอยู่ระหว่าง 0-${maxScore}`;
+      },
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      await api(
+        `/exams/${examId}/attempts/${student.attemptId}/score`,
+        {
+          ...jsonBody({ score: Number(result.value) }),
+          method: "PATCH",
+        },
+        token,
+      );
+      setExamAnalysis(
+        await api<ExamAnalysis>(`/analytics/exams/${examId}`, {}, token),
+      );
+      await Swal.fire({
+        icon: "success",
+        title: "บันทึกคะแนนแล้ว",
+        text: `${student.name} ได้ ${Number(result.value)}/${maxScore} คะแนน`,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    }
+  };
+
   const resetExamResult = async (
     examId: string,
     student: ExamAnalysis["students"][number],
@@ -2232,7 +2377,7 @@ export function AdminApp() {
     const answer = await Swal.fire({
       icon: "warning",
       title: `รีเซ็ตผลสอบของ ${student.name}?`,
-      html: `ผลสอบ คำตอบ และประวัติการทำชุดสอบนี้ของ <b>${student.studentCode}</b> จะถูกลบ<br>นักเรียนจะสามารถเริ่มสอบใหม่ได้เมื่อชุดสอบเปิดอยู่`,
+      html: `ผลสอบ คำตอบ และประวัติการทำชุดสอบนี้ของ <b>${student.studentCode}</b> จะถูกนำออก<br>สามารถกู้คืนภายหลังได้จากเมนู <b>กู้คืนผลสอบ</b>`,
       showCancelButton: true,
       confirmButtonText: "รีเซ็ตผลสอบ",
       cancelButtonText: "ยกเลิก",
@@ -2265,6 +2410,43 @@ export function AdminApp() {
       await showError(error);
     } finally {
       setResettingAttemptId(null);
+    }
+  };
+
+  const restoreExamResult = async (row: ResetExamResult) => {
+    if (!token) return;
+    const answer = await Swal.fire({
+      icon: "question",
+      title: `กู้คืนผลสอบของ ${row.studentName}?`,
+      html: `ระบบจะนำคะแนน คำตอบ และประวัติการทำ <b>${escapeHtml(row.examTitle)}</b> กลับคืน ${row.attemptCount} ครั้ง`,
+      showCancelButton: true,
+      confirmButtonText: "กู้คืนผลสอบ",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#2f8b68",
+    });
+    if (!answer.isConfirmed) return;
+
+    setRestoringArchiveId(row.id);
+    try {
+      await api(
+        `/exams/reset-attempts/${row.id}/restore`,
+        { method: "POST" },
+        token,
+      );
+      setResetExamResults((current) =>
+        current.filter((item) => item.id !== row.id),
+      );
+      await Swal.fire({
+        icon: "success",
+        title: "กู้คืนผลสอบแล้ว",
+        text: `คะแนนและคำตอบของ ${row.studentName} กลับมาแล้ว`,
+        timer: 1600,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    } finally {
+      setRestoringArchiveId(null);
     }
   };
 
@@ -2924,7 +3106,16 @@ export function AdminApp() {
               analysis={examAnalysis}
               onOpen={openExamAnalysis}
               onReset={resetExamResult}
+              onEditMaxScore={editExamMaxScore}
+              onEditScore={editExamStudentScore}
               resettingAttemptId={resettingAttemptId}
+            />
+          )}
+          {!loading && page === "score-recovery" && (
+            <ScoreRecoveryView
+              rows={resetExamResults}
+              onRestore={restoreExamResult}
+              restoringArchiveId={restoringArchiveId}
             />
           )}
           {!loading && page === "exam-locks" && (
@@ -5316,12 +5507,19 @@ function ResultsView({
   analysis,
   onOpen,
   onReset,
+  onEditMaxScore,
+  onEditScore,
   resettingAttemptId,
 }: {
   rows: Exam[];
   analysis: ExamAnalysis | null;
   onOpen: (examId: string) => void;
   onReset: (examId: string, student: ExamAnalysis["students"][number]) => void;
+  onEditMaxScore: (analysis: ExamAnalysis) => void;
+  onEditScore: (
+    examId: string,
+    student: ExamAnalysis["students"][number],
+  ) => void;
   resettingAttemptId: string | null;
 }) {
   const measured = analysis?.students.length ?? 0;
@@ -5363,10 +5561,24 @@ function ResultsView({
       <section className="panel result-detail">
         {analysis ? (
           <>
-            <PanelHeader
-              title={analysis.title}
-              subtitle={`${analysis.subject} · ${analysis.classroom}`}
-            />
+            <header className="panel-header result-panel-header">
+              <div>
+                <h3>{analysis.title}</h3>
+                <p>
+                  {analysis.subject} · {analysis.classroom}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="edit-max-score-button"
+                onClick={() => void onEditMaxScore(analysis)}
+              >
+                <PencilLine /> แก้คะแนนเต็ม
+                {analysis.maxScore != null
+                  ? ` (${Number(analysis.maxScore)})`
+                  : ""}
+              </button>
+            </header>
             <div className="result-metrics">
               <article>
                 <span>ผู้ส่งข้อสอบ</span>
@@ -5402,6 +5614,8 @@ function ResultsView({
                   {analysis.students.length ? (
                     analysis.students.map((student) => {
                       const score = Number(student.percentage ?? 0);
+                      const rawScore = Number(student.score ?? 0);
+                      const maxScore = Number(student.maxScore ?? 0);
                       const isResetting =
                         resettingAttemptId === student.attemptId;
                       return (
@@ -5414,7 +5628,12 @@ function ResultsView({
                           <td>
                             <strong>{student.name}</strong>
                           </td>
-                          <td>{score.toFixed(1)}%</td>
+                          <td className="result-score-cell">
+                            <strong>
+                              {rawScore}/{maxScore}
+                            </strong>
+                            <small>{score.toFixed(1)}%</small>
+                          </td>
                           <td>
                             {score >= 80
                               ? "เก่ง"
@@ -5423,18 +5642,35 @@ function ResultsView({
                                 : "ต้องเสริม"}
                           </td>
                           <td>
-                            <button
-                              type="button"
-                              className="reset-result-button"
-                              onClick={() => void onReset(analysis.id, student)}
-                              disabled={Boolean(resettingAttemptId)}
-                              title="รีเซ็ตผลสอบเพื่อให้นักเรียนสอบใหม่"
-                            >
-                              <RotateCcw
-                                className={isResetting ? "spin" : ""}
-                              />{" "}
-                              {isResetting ? "กำลังรีเซ็ต..." : "รีเซ็ตผลสอบ"}
-                            </button>
+                            <div className="result-row-actions">
+                              <button
+                                type="button"
+                                className="edit-result-score-button"
+                                onClick={() =>
+                                  void onEditScore(analysis.id, student)
+                                }
+                                disabled={Boolean(resettingAttemptId)}
+                                title="กรอกคะแนนสอบให้นักเรียนโดยตรง"
+                              >
+                                <PencilLine /> กรอก/แก้คะแนน
+                              </button>
+                              <button
+                                type="button"
+                                className="reset-result-button"
+                                onClick={() =>
+                                  void onReset(analysis.id, student)
+                                }
+                                disabled={Boolean(resettingAttemptId)}
+                                title="รีเซ็ตผลสอบเพื่อให้นักเรียนสอบใหม่"
+                              >
+                                <RotateCcw
+                                  className={isResetting ? "spin" : ""}
+                                />{" "}
+                                {isResetting
+                                  ? "กำลังรีเซ็ต..."
+                                  : "รีเซ็ตผลสอบ"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -5451,6 +5687,84 @@ function ResultsView({
         )}
       </section>
     </div>
+  );
+}
+
+function ScoreRecoveryView({
+  rows,
+  onRestore,
+  restoringArchiveId,
+}: {
+  rows: ResetExamResult[];
+  onRestore: (row: ResetExamResult) => void;
+  restoringArchiveId: string | null;
+}) {
+  return (
+    <section className="panel full-panel score-recovery-panel">
+      <PanelHeader
+        title="ผลสอบที่กู้คืนได้"
+        subtitle={`${rows.length} รายการที่ถูกรีเซ็ตและยังไม่ได้กู้คืน`}
+      />
+      {rows.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>นักเรียน</th>
+                <th>ชุดข้อสอบ</th>
+                <th>จำนวนครั้ง</th>
+                <th>รีเซ็ตเมื่อ</th>
+                <th>ผู้รีเซ็ต</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const isRestoring = restoringArchiveId === row.id;
+                return (
+                  <tr key={row.id}>
+                    <td className="person-cell">
+                      <strong>{row.studentName}</strong>
+                      <small>{row.studentCode}</small>
+                    </td>
+                    <td>
+                      <strong>{row.examTitle}</strong>
+                    </td>
+                    <td>{row.attemptCount} ครั้ง</td>
+                    <td>
+                      {new Date(row.resetAt).toLocaleString("th-TH", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </td>
+                    <td>{row.resetByName}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="restore-result-button"
+                        onClick={() => void onRestore(row)}
+                        disabled={Boolean(restoringArchiveId)}
+                      >
+                        <RotateCcw className={isRestoring ? "spin" : ""} />
+                        {isRestoring ? "กำลังกู้คืน..." : "กู้คืนผลสอบ"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="score-recovery-empty">
+          <RotateCcw />
+          <strong>ไม่มีผลสอบที่รอกู้คืน</strong>
+          <span>
+            ผลสอบที่รีเซ็ตหลังเปิดใช้ระบบสำรองนี้จะปรากฏในหน้านี้โดยอัตโนมัติ
+          </span>
+        </div>
+      )}
+    </section>
   );
 }
 
