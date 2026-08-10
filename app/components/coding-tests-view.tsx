@@ -342,7 +342,7 @@ export function CodingTestsView({
                   <FileText /> โจทย์ {row._count.problems} ข้อ
                 </span>
                 <span>
-                  <CheckCircle2 /> เลือกทำ {row.requiredCount} ข้อ
+                  <CheckCircle2 /> ทำขั้นต่ำ {row.requiredCount} ข้อ
                 </span>
                 <span>
                   <Bot /> {row.aiGradingEnabled ? "AI ตรวจ" : "ครูตรวจ"}
@@ -433,7 +433,7 @@ export function CodingTestsView({
             <header>
               <div>
                 <h2>{editing ? "แก้ไข Coding Test" : "สร้าง Coding Test"}</h2>
-                <p>นักเรียนจะเห็นโจทย์ทั้งหมดและเลือกทำตามจำนวนที่กำหนด</p>
+                <p>นักเรียนจะเห็นโจทย์ทั้งหมดและต้องทำอย่างน้อยตามจำนวนที่กำหนด</p>
               </div>
               <button type="button" onClick={() => setEditing(undefined)}>
                 <X />
@@ -490,7 +490,7 @@ export function CodingTestsView({
               </div>
               <div className="field-row">
                 <label>
-                  จำนวนข้อที่ต้องทำ
+                  จำนวนข้อขั้นต่ำที่ต้องทำ
                   <input
                     name="requiredCount"
                     required
