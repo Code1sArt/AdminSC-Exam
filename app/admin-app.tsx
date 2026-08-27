@@ -1059,6 +1059,15 @@ export function AdminApp() {
         let currentProfile = profile;
         if (!currentProfile) {
           currentProfile = await api<UserProfile>("/auth/me", {}, token);
+          if (currentProfile.role.toUpperCase() === "STUDENT") {
+            logout();
+            await Swal.fire({
+              icon: "error",
+              title: "คุณไม่สามารถเข้าถึงได้",
+              confirmButtonText: "ตกลง",
+            });
+            return;
+          }
           setProfile(currentProfile);
         }
         if (target === "dashboard") {
@@ -1263,7 +1272,21 @@ export function AdminApp() {
           password: form.get("password"),
         }),
       );
+      const currentProfile = await api<UserProfile>(
+        "/auth/me",
+        {},
+        result.accessToken,
+      );
+      if (currentProfile.role.toUpperCase() === "STUDENT") {
+        await Swal.fire({
+          icon: "error",
+          title: "คุณไม่สามารถเข้าถึงได้",
+          confirmButtonText: "ตกลง",
+        });
+        return;
+      }
       sessionStorage.setItem("lab_edu_admin_token", result.accessToken);
+      setProfile(currentProfile);
       setToken(result.accessToken);
       await Swal.fire({
         icon: "success",
@@ -3287,7 +3310,7 @@ function LoginScreen({
           </div>
           <span className="login-kicker">LAB EDU PORTAL</span>
           <h2>ยินดีต้อนรับกลับมา</h2>
-          <p>เข้าสู่ระบบสำหรับผู้ดูแล ครู และนักเรียน</p>
+          <p>เข้าสู่ระบบสำหรับผู้ดูแลและครู</p>
           <label>
             อีเมล หรือรหัสประจำตัวนักเรียน
             <input name="identifier" required autoComplete="username" />
