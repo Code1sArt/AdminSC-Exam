@@ -82,6 +82,8 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /ให้คะแนนทั้งห้อง/);
   assert.match(app, /\/assignments\/\$\{assignment\.id\}\/grades/);
   assert.match(app, /ยังไม่ส่งในระบบ/);
+  assert.match(app, /รวมถึงคะแนนและผลประเมินที่ตรวจไว้จะถูกลบถาวร/);
+  assert.doesNotMatch(app, /showConfirmButton: !assignment\._count\.submissions/);
   assert.match(app, /ยังไม่ได้เพิ่ม API Key/);
   assert.match(apiClient, /NEXT_PUBLIC_API_URL/);
   assert.match(packageJson, /"sweetalert2"/);

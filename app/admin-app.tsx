@@ -1942,16 +1942,16 @@ export function AdminApp() {
 
   const deleteAssignment = async (assignment: Assignment) => {
     if (!token) return;
+    const submissionCount = assignment._count.submissions;
     const answer = await Swal.fire({
       icon: "warning",
       title: `ลบงาน ${assignment.title}?`,
-      text: assignment._count.submissions
-        ? "มีนักเรียนส่งงานแล้ว จึงไม่สามารถลบได้"
-        : "ข้อมูลนี้จะถูกลบถาวร",
+      html: submissionCount
+        ? `งานส่งของนักเรียน <b>${submissionCount} รายการ</b> รวมถึงคะแนนและผลประเมินที่ตรวจไว้จะถูกลบถาวร`
+        : "ข้อมูลงานนี้จะถูกลบถาวร",
       showCancelButton: true,
-      showConfirmButton: !assignment._count.submissions,
       confirmButtonText: "ลบงาน",
-      cancelButtonText: assignment._count.submissions ? "รับทราบ" : "ยกเลิก",
+      cancelButtonText: "ยกเลิก",
       confirmButtonColor: "#d65b65",
     });
     if (!answer.isConfirmed) return;
