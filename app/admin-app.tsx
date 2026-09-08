@@ -341,6 +341,7 @@ interface Assignment {
   type: "GENERAL" | "CODE";
   codeLanguage?: "C" | "CPP" | "CSHARP" | "PYTHON" | null;
   problemPdfUrl?: string | null;
+  resourceUrl?: string | null;
   aiGradingEnabled: boolean;
   aiGradingModel?: string | null;
   isGroupWork: boolean;
@@ -1486,6 +1487,7 @@ export function AdminApp() {
               subjectId: data.get("subjectId"),
               maxScore: Number(data.get("maxScore")),
               dueAt: new Date(String(data.get("dueAt"))).toISOString(),
+              resourceUrl: String(data.get("resourceUrl") ?? "").trim(),
               status: data.get("status"),
               type: data.get("type"),
               codeLanguage:
@@ -4806,6 +4808,9 @@ function AssignmentsView({
             </summary>
             <div className="assignment-detail">
               <p>{assignment.description}</p>
+              {assignment.resourceUrl && /^https?:\/\//i.test(assignment.resourceUrl) && (
+                <a href={assignment.resourceUrl} target="_blank" rel="noopener noreferrer">เปิดลิงก์ประกอบงาน</a>
+              )}
               <div className="assignment-toolbar">
                 <span>
                   คะแนนเต็ม <b>{Number(assignment.maxScore)}</b>
@@ -5193,6 +5198,9 @@ function LegacyAssignmentsView({
             </summary>
             <div className="assignment-detail">
               <p>{assignment.description}</p>
+              {assignment.resourceUrl && /^https?:\/\//i.test(assignment.resourceUrl) && (
+                <a href={assignment.resourceUrl} target="_blank" rel="noopener noreferrer">เปิดลิงก์ประกอบงาน</a>
+              )}
               <div className="assignment-toolbar">
                 <span>
                   คะแนนเต็ม <b>{Number(assignment.maxScore)}</b>
@@ -8290,6 +8298,18 @@ function DataModal({
                     defaultValue={editingAssignment?.description}
                     required
                   />
+                </label>
+                <label className="form-field">
+                  ลิงก์ประกอบงาน (ไม่บังคับ)
+                  <input
+                    name="resourceUrl"
+                    type="url"
+                    maxLength={2048}
+                    pattern="https?://.*"
+                    defaultValue={editingAssignment?.resourceUrl ?? ""}
+                    placeholder="https://drive.google.com/..."
+                  />
+                  <small className="field-hint">แนบเอกสาร วิดีโอ หรือเว็บไซต์ และตั้งค่าการแชร์ให้นักเรียนเปิดดูได้</small>
                 </label>
                 <div className="field-row">
                   <SelectField
