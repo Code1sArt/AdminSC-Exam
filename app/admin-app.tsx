@@ -4448,12 +4448,78 @@ function ExamsView({
   onEdit: (exam: Exam) => void;
   onDelete: (exam: Exam) => void;
 }) {
+  const [subjectId, setSubjectId] = useState("ALL");
+  const [status, setStatus] = useState("ALL");
+  const examSubjects = useMemo(
+    () =>
+      Array.from(
+        new Map(rows.map((exam) => [exam.subject.id, exam.subject.name])).entries(),
+      ).sort(([, firstName], [, secondName]) =>
+        firstName.localeCompare(secondName, "th"),
+      ),
+    [rows],
+  );
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(
+        (exam) =>
+          (subjectId === "ALL" || exam.subject.id === subjectId) &&
+          (status === "ALL" || exam.status === status),
+      ),
+    [rows, status, subjectId],
+  );
+  const hasFilters = subjectId !== "ALL" || status !== "ALL";
+
   return (
     <section className="panel full-panel">
       <PanelHeader
-        title={`ชุดข้อสอบ ${rows.length} ชุด`}
+        title={
+          hasFilters
+            ? `ชุดข้อสอบ ${filteredRows.length} จาก ${rows.length} ชุด`
+            : `ชุดข้อสอบ ${rows.length} ชุด`
+        }
         subtitle="กำหนดคลังข้อสอบ จำนวนที่ใช้จริง และเปิด–ปิดการเข้าสอบ"
       />
+      <div className="exam-filters">
+        <label>
+          รายวิชา
+          <select
+            value={subjectId}
+            onChange={(event) => setSubjectId(event.target.value)}
+          >
+            <option value="ALL">ทุกวิชา</option>
+            {examSubjects.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          สถานะ
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="ALL">ทุกสถานะ</option>
+            <option value="PUBLISHED">เผยแพร่</option>
+            <option value="DRAFT">ฉบับร่าง</option>
+            <option value="CLOSED">ปิดสอบ</option>
+            <option value="ARCHIVED">เก็บถาวร</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className="filter-reset"
+          disabled={!hasFilters}
+          onClick={() => {
+            setSubjectId("ALL");
+            setStatus("ALL");
+          }}
+        >
+          ล้างตัวกรอง
+        </button>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
@@ -4470,8 +4536,8 @@ function ExamsView({
             </tr>
           </thead>
           <tbody>
-            {rows.length ? (
-              rows.map((exam) => {
+            {filteredRows.length ? (
+              filteredRows.map((exam) => {
                 const isOpen = exam.status === "PUBLISHED";
                 return (
                   <tr key={exam.id}>
