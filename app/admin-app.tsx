@@ -7732,6 +7732,7 @@ function DataModal({
   const [examSubjectId, setExamSubjectId] = useState(
     editingExam?.subject.id ?? subjects[0]?.id ?? "",
   );
+  const [examIndicatorId, setExamIndicatorId] = useState("ALL");
   const [examAdaptive, setExamAdaptive] = useState(
     editingExam?.isAdaptive ?? false,
   );
@@ -7785,6 +7786,30 @@ function DataModal({
   const [assignmentGroupWork, setAssignmentGroupWork] = useState(
     editingAssignment?.isGroupWork ?? false,
   );
+  const examIndicators = useMemo(
+    () =>
+      indicators
+        .filter((indicator) => indicator.subject.id === examSubjectId)
+        .sort((first, second) => first.code.localeCompare(second.code, "th")),
+    [examSubjectId, indicators],
+  );
+  const visibleExamQuestions = useMemo(
+    () =>
+      questions.filter(
+        (question) =>
+          question.subject.id === examSubjectId &&
+          (examIndicatorId === "ALL" ||
+            (examIndicatorId === "UNASSIGNED"
+              ? !question.indicator
+              : question.indicator?.id === examIndicatorId)),
+      ),
+    [examIndicatorId, examSubjectId, questions],
+  );
+  const allVisibleExamQuestionsSelected =
+    visibleExamQuestions.length > 0 &&
+    visibleExamQuestions.every((question) =>
+      examQuestionIds.has(question.id),
+    );
   const codeModels = [
     ...new Set(
       (aiStatus?.services ?? [])
@@ -8133,6 +8158,7 @@ function DataModal({
                       value={examSubjectId}
                       onChange={(event) => {
                         setExamSubjectId(event.target.value);
+                        setExamIndicatorId("ALL");
                         setExamQuestionIds(new Set());
                         setExamTypeCounts(
                           Object.fromEntries(
@@ -8296,33 +8322,55 @@ function DataModal({
                     <button
                       type="button"
                       className="text-button"
+                      disabled={!visibleExamQuestions.length}
                       onClick={() => {
-                        const visible = questions.filter(
-                          (question) => question.subject.id === examSubjectId,
-                        );
-                        setExamQuestionIds((current) =>
-                          current.size === visible.length
-                            ? new Set()
-                            : new Set(visible.map((question) => question.id)),
-                        );
+                        setExamQuestionIds((current) => {
+                          const next = new Set(current);
+                          visibleExamQuestions.forEach((question) => {
+                            if (allVisibleExamQuestionsSelected)
+                              next.delete(question.id);
+                            else next.add(question.id);
+                          });
+                          return next;
+                        });
                       }}
                     >
-                      {examQuestionIds.size ===
-                      questions.filter(
-                        (question) => question.subject.id === examSubjectId,
-                      ).length
+                      {allVisibleExamQuestionsSelected
                         ? "ยกเลิกทั้งหมด"
                         : "เลือกทั้งหมด"}
                     </button>
                   </div>
-                  {questions
-                    .filter((question) => question.subject.id === examSubjectId)
-                    .map((question) => (
+                  <div className="question-picker-filter">
+                    <label htmlFor="exam-indicator-filter">ตัวชี้วัด</label>
+                    <select
+                      id="exam-indicator-filter"
+                      value={examIndicatorId}
+                      onChange={(event) =>
+                        setExamIndicatorId(event.target.value)
+                      }
+                    >
+                      <option value="ALL">ทุกตัวชี้วัด</option>
+                      {examIndicators.map((indicator) => (
+                        <option key={indicator.id} value={indicator.id}>
+                          {indicator.code} — {indicator.description}
+                        </option>
+                      ))}
+                      <option value="UNASSIGNED">ไม่ระบุตัวชี้วัด</option>
+                    </select>
+                    <span>พบ {visibleExamQuestions.length} ข้อ</span>
+                  </div>
+                  {[...examQuestionIds].map((questionId) => (
+                    <input
+                      key={questionId}
+                      type="hidden"
+                      name="questionIds"
+                      value={questionId}
+                    />
+                  ))}
+                  {visibleExamQuestions.map((question) => (
                       <label key={question.id}>
                         <input
                           type="checkbox"
-                          name="questionIds"
-                          value={question.id}
                           checked={examQuestionIds.has(question.id)}
                           onChange={(event) => {
                             setExamQuestionIds((current) => {
@@ -8337,14 +8385,19 @@ function DataModal({
                           <b>{question.prompt}</b>
                           <small>
                             {questionTypeLabel[question.type]} ·{" "}
-                            {difficultyLabel[question.difficulty]}
+                            {difficultyLabel[question.difficulty]} ·{" "}
+                            {question.indicator?.code ?? "ไม่ระบุตัวชี้วัด"}
                           </small>
                         </span>
                       </label>
                     ))}
-                  {!questions.some(
-                    (question) => question.subject.id === examSubjectId,
-                  ) && <p>ยังไม่มีข้อสอบในวิชานี้</p>}
+                  {!visibleExamQuestions.length && (
+                    <p>
+                      {examIndicatorId === "ALL"
+                        ? "ยังไม่มีข้อสอบในวิชานี้"
+                        : "ไม่พบข้อสอบตามตัวชี้วัดที่เลือก"}
+                    </p>
+                  )}
                 </div>
               </>
             )}
