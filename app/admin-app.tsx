@@ -1129,11 +1129,18 @@ export function AdminApp() {
           setSubjects(subjectRows);
           setIndicators(indicatorRows);
         } else if (target === "exams") {
-          const [examRows, classRows, subjectRows, questionResult] =
+          const [
+            examRows,
+            classRows,
+            subjectRows,
+            indicatorRows,
+            questionResult,
+          ] =
             await Promise.all([
               api<Exam[]>("/exams", {}, token),
               api<Classroom[]>("/academic/classrooms", {}, token),
               api<Subject[]>("/academic/subjects", {}, token),
+              api<Indicator[]>("/academic/indicators", {}, token),
               api<{ data: Question[] }>("/questions?limit=500", {}, token),
             ]);
           const normalizedExamRows = examRows.map((exam) => ({
@@ -1144,6 +1151,7 @@ export function AdminApp() {
           setExams(normalizedExamRows);
           setClassrooms(classRows);
           setSubjects(subjectRows);
+          setIndicators(indicatorRows);
           // The questions endpoint only returns active questions. Do not merge
           // historical exam items into this selectable pool: an item can refer
           // to a question that has since been deactivated, and the exams API
