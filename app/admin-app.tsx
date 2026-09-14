@@ -1315,7 +1315,12 @@ export function AdminApp() {
     data: FormData,
   ) => {
     if (!token) return;
-    setLoading(true);
+    // Keep the assignment browser mounted while an assignment is saved.
+    // Its classroom/subject filters are local state, so a full-page loading
+    // transition would otherwise reset those selections after every save.
+    const preservesAssignmentFilters = kind === "assignment";
+    if (preservesAssignmentFilters) setRefreshing(true);
+    else setLoading(true);
     try {
       if (kind === "student") {
         await api(
@@ -1576,7 +1581,8 @@ export function AdminApp() {
     } catch (error) {
       await showError(error);
     } finally {
-      setLoading(false);
+      if (preservesAssignmentFilters) setRefreshing(false);
+      else setLoading(false);
     }
   };
 
