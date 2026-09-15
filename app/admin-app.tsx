@@ -917,6 +917,9 @@ export function AdminApp() {
   const [resettingAttemptId, setResettingAttemptId] = useState<string | null>(
     null,
   );
+  const [resettingSubmissionId, setResettingSubmissionId] = useState<
+    string | null
+  >(null);
   const [resetExamResults, setResetExamResults] = useState<ResetExamResult[]>(
     [],
   );
@@ -2085,6 +2088,50 @@ export function AdminApp() {
     }
   };
 
+  const resetAssignmentScore = async (
+    assignment: Assignment,
+    submission: AssignmentSubmission,
+  ) => {
+    if (!token) return;
+    const studentName = assignment.isGroupWork
+      ? `กลุ่ม ${submission.groupName ?? ""}`.trim()
+      : `${submission.student.user.firstName} ${submission.student.user.lastName}`.trim();
+    const answer = await Swal.fire({
+      icon: "warning",
+      title: `รีเซ็ตคะแนนของ ${studentName}?`,
+      html: assignment.isGroupWork
+        ? "คะแนน ความคิดเห็น และผลประเมินของสมาชิกทั้งกลุ่มจะถูกล้าง<br>งานและไฟล์ที่ส่งไว้จะยังคงอยู่"
+        : "คะแนน ความคิดเห็น และผลประเมินของนักเรียนจะถูกล้าง<br>งานและไฟล์ที่ส่งไว้จะยังคงอยู่",
+      showCancelButton: true,
+      confirmButtonText: "รีเซ็ตคะแนน",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#d65b65",
+      focusCancel: true,
+    });
+    if (!answer.isConfirmed) return;
+
+    setResettingSubmissionId(submission.id);
+    try {
+      await api(
+        `/assignments/${assignment.id}/submissions/${submission.id}/grade`,
+        { method: "DELETE" },
+        token,
+      );
+      await loadPage("assignments", true);
+      await Swal.fire({
+        icon: "success",
+        title: "รีเซ็ตคะแนนแล้ว",
+        text: `ล้างคะแนนของ ${studentName} เรียบร้อยแล้ว`,
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      await showError(error);
+    } finally {
+      setResettingSubmissionId(null);
+    }
+  };
+
   const gradeClassroom = async (
     assignment: Assignment,
     selectedStudentId?: string,
@@ -3136,9 +3183,11 @@ export function AdminApp() {
               onDelete={deleteAssignment}
               onStatus={updateAssignmentStatus}
               onGrade={gradeSubmission}
+              onResetScore={resetAssignmentScore}
               onGradeClassroom={gradeClassroom}
               onRunCode={runSubmissionCode}
               onEditScale={editGradeScale}
+              resettingSubmissionId={resettingSubmissionId}
             />
           )}
           {!loading && page === "grades" && (
@@ -4663,9 +4712,11 @@ function AssignmentsView({
   onDelete,
   onStatus,
   onGrade,
+  onResetScore,
   onGradeClassroom,
   onRunCode,
   onEditScale,
+  resettingSubmissionId,
 }: {
   rows: Assignment[];
   gradeScale: Record<string, number>;
@@ -4673,12 +4724,17 @@ function AssignmentsView({
   onDelete: (row: Assignment) => void;
   onStatus: (row: Assignment) => void;
   onGrade: (assignment: Assignment, submission: AssignmentSubmission) => void;
+  onResetScore: (
+    assignment: Assignment,
+    submission: AssignmentSubmission,
+  ) => void;
   onGradeClassroom: (
     assignment: Assignment,
     selectedStudentId?: string,
   ) => void;
   onRunCode: (assignment: Assignment, submission: AssignmentSubmission) => void;
   onEditScale: () => void;
+  resettingSubmissionId: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
@@ -5042,9 +5098,31 @@ function AssignmentsView({
                                 onClick={() =>
                                   void onGrade(assignment, submission)
                                 }
+                                disabled={Boolean(resettingSubmissionId)}
                               >
                                 ให้คะแนน
                               </button>
+                              {submission.status === "GRADED" && (
+                                <button
+                                  className="button secondary compact-button reset-score-button"
+                                  onClick={() =>
+                                    void onResetScore(assignment, submission)
+                                  }
+                                  disabled={Boolean(resettingSubmissionId)}
+                                  title="ล้างคะแนนและผลประเมิน โดยคงงานที่ส่งไว้"
+                                >
+                                  <RotateCcw
+                                    className={
+                                      resettingSubmissionId === submission.id
+                                        ? "spin"
+                                        : ""
+                                    }
+                                  />
+                                  {resettingSubmissionId === submission.id
+                                    ? "กำลังรีเซ็ต..."
+                                    : "รีเซ็ตคะแนน"}
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -5145,9 +5223,31 @@ function AssignmentsView({
                                 onClick={() =>
                                   void onGradeClassroom(assignment, student.id)
                                 }
+                                disabled={Boolean(resettingSubmissionId)}
                               >
                                 ให้คะแนน
                               </button>
+                              {submission?.status === "GRADED" && (
+                                <button
+                                  className="button secondary compact-button reset-score-button"
+                                  onClick={() =>
+                                    void onResetScore(assignment, submission)
+                                  }
+                                  disabled={Boolean(resettingSubmissionId)}
+                                  title="ล้างคะแนนและผลประเมิน โดยคงงานที่ส่งไว้"
+                                >
+                                  <RotateCcw
+                                    className={
+                                      resettingSubmissionId === submission.id
+                                        ? "spin"
+                                        : ""
+                                    }
+                                  />
+                                  {resettingSubmissionId === submission.id
+                                    ? "กำลังรีเซ็ต..."
+                                    : "รีเซ็ตคะแนน"}
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );

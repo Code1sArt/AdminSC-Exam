@@ -81,6 +81,12 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /ให้คะแนน/);
   assert.match(app, /ให้คะแนนทั้งห้อง/);
   assert.match(app, /\/assignments\/\$\{assignment\.id\}\/grades/);
+  assert.match(
+    app,
+    /`\/assignments\/\$\{assignment\.id\}\/submissions\/\$\{submission\.id\}\/grade`/,
+  );
+  assert.match(app, /รีเซ็ตคะแนน/);
+  assert.match(app, /onResetScore\(assignment, submission\)/);
   assert.match(app, /ยังไม่ส่งในระบบ/);
   assert.match(app, /รวมถึงคะแนนและผลประเมินที่ตรวจไว้จะถูกลบถาวร/);
   assert.doesNotMatch(app, /showConfirmButton: !assignment\._count\.submissions/);

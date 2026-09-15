@@ -1673,6 +1673,19 @@ td span {
   padding: 0 9px !important;
   font-size: 9px !important;
 }
+.reset-score-button {
+  border-color: #f0c9cd !important;
+  color: #b6535d !important;
+  background: #fff8f8 !important;
+}
+.reset-score-button:hover:not(:disabled) {
+  border-color: #df929a !important;
+  background: #fff0f1 !important;
+}
+.reset-score-button svg {
+  width: 12px;
+  height: 12px;
+}
 .swal-field {
   display: grid;
   gap: 6px;
