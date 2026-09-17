@@ -4856,7 +4856,7 @@ function AssignmentsView({
       void Swal.fire({
         icon: "success",
         title: "ส่งออกคะแนนเรียบร้อย",
-        text: "ไฟล์ Excel แยกชีตคะแนนรายงานและคะแนนสอบแล้ว",
+        text: "ไฟล์ Excel เรียงคะแนนงานแต่ละชิ้น ตามด้วยคะแนนสอบ คะแนนรวม และเกรดแล้ว",
         timer: 1800,
         showConfirmButton: false,
       });
@@ -4889,7 +4889,7 @@ function AssignmentsView({
           <div>
             <strong>Export คะแนนเป็น Excel</strong>
             <span>
-              เลือกส่งออกรายห้อง รายวิชา หรือทั้งหมด · แยกชีตคะแนนรายงานและคะแนนสอบ
+              เลือกส่งออกรายห้อง รายวิชา หรือทั้งหมด · แยกคอลัมน์งาน ข้อสอบ คะแนนรวม และเกรด
             </span>
           </div>
         </div>

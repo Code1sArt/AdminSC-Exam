@@ -43,6 +43,12 @@ export type ScoreExportFilters = {
 
 type CellValue = string | number | null | undefined;
 
+type ScoreColumn = {
+  key: string;
+  title: string;
+  maxScore: number;
+};
+
 const encoder = new TextEncoder();
 
 const xmlEscape = (value: CellValue) =>
@@ -188,6 +194,9 @@ const zipFiles = (files: Record<string, string>, generatedAt: Date) => {
 const percentage = (score: number, maxScore: number) =>
   maxScore > 0 ? Number(((score / maxScore) * 100).toFixed(2)) : 0;
 
+const scoreColumnKey = (subjectId: string, resultId: string) =>
+  `${subjectId}:${resultId}`;
+
 export function createScoreWorkbook(
   data: ScoreExportData,
   filters: ScoreExportFilters = {},
@@ -215,6 +224,37 @@ export function createScoreWorkbook(
 
   if (!selected.length) throw new Error("ไม่พบข้อมูลคะแนนตามห้องเรียนและรายวิชาที่เลือก");
 
+  const multipleSubjects = new Set(
+    selected.map(({ subject }) => subject.id),
+  ).size > 1;
+  const assignmentColumnMap = new Map<string, ScoreColumn>();
+  const examColumnMap = new Map<string, ScoreColumn>();
+  selected.forEach(({ subject, students }) => {
+    students.forEach((student) => {
+      student.assignmentResults.forEach((result) => {
+        const key = scoreColumnKey(subject.id, result.id);
+        if (!assignmentColumnMap.has(key)) {
+          assignmentColumnMap.set(key, {
+            key,
+            title: `${multipleSubjects ? `${subject.code} · ` : ""}${result.title}`,
+            maxScore: result.maxScore,
+          });
+        }
+      });
+      student.examResults.forEach((result) => {
+        const key = scoreColumnKey(subject.id, result.id);
+        if (!examColumnMap.has(key)) {
+          examColumnMap.set(key, {
+            key,
+            title: `${multipleSubjects ? `${subject.code} · ` : ""}${result.title}`,
+            maxScore: result.maxScore,
+          });
+        }
+      });
+    });
+  });
+  const assignmentColumns = Array.from(assignmentColumnMap.values());
+  const examColumns = Array.from(examColumnMap.values());
   const summaryRows: CellValue[][] = [
     [
       "ห้องเรียน",
@@ -224,14 +264,14 @@ export function createScoreWorkbook(
       "รายวิชา",
       "รหัสนักเรียน",
       "ชื่อ-นามสกุล",
-      "คะแนนรายงาน",
-      "เต็มรายงาน",
-      "ร้อยละรายงาน",
-      "คะแนนสอบ",
-      "เต็มสอบ",
-      "ร้อยละสอบ",
+      ...assignmentColumns.map(
+        (column) => `งาน: ${column.title} (เต็ม ${column.maxScore})`,
+      ),
+      ...examColumns.map(
+        (column) => `สอบ: ${column.title} (เต็ม ${column.maxScore})`,
+      ),
       "คะแนนรวม",
-      "เต็มรวม",
+      "คะแนนเต็มรวม",
       "ร้อยละรวม",
       "เกรด",
     ],
@@ -265,6 +305,18 @@ export function createScoreWorkbook(
 
   selected.forEach(({ classroom, subject, students }) => {
     students.forEach((student) => {
+      const assignmentScores = new Map(
+        student.assignmentResults.map((result) => [
+          scoreColumnKey(subject.id, result.id),
+          result.score,
+        ]),
+      );
+      const examScores = new Map(
+        student.examResults.map((result) => [
+          scoreColumnKey(subject.id, result.id),
+          result.score,
+        ]),
+      );
       summaryRows.push([
         classroom.name,
         classroom.gradeLevel ?? "",
@@ -273,12 +325,10 @@ export function createScoreWorkbook(
         subject.name,
         student.studentCode,
         student.name,
-        student.assignmentScore,
-        student.assignmentMaxScore,
-        percentage(student.assignmentScore, student.assignmentMaxScore),
-        student.examScore,
-        student.examMaxScore,
-        percentage(student.examScore, student.examMaxScore),
+        ...assignmentColumns.map(
+          (column) => assignmentScores.get(column.key) ?? "",
+        ),
+        ...examColumns.map((column) => examScores.get(column.key) ?? ""),
         student.score,
         student.maxScore,
         student.percentage == null

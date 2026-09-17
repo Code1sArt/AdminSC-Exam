@@ -95,6 +95,10 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(scoreExport, /"สรุปคะแนน"/);
   assert.match(scoreExport, /"คะแนนรายงาน"/);
   assert.match(scoreExport, /"คะแนนสอบ"/);
+  assert.match(scoreExport, /`งาน: \$\{column\.title\}/);
+  assert.match(scoreExport, /`สอบ: \$\{column\.title\}/);
+  assert.match(scoreExport, /"คะแนนรวม"/);
+  assert.match(scoreExport, /"เกรด"/);
   assert.match(scoreExport, /spreadsheetml\.sheet/);
   assert.match(app, /รวมถึงคะแนนและผลประเมินที่ตรวจไว้จะถูกลบถาวร/);
   assert.doesNotMatch(app, /showConfirmButton: !assignment\._count\.submissions/);
