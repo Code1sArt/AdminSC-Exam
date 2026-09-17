@@ -850,6 +850,80 @@ td span {
   font-size: 13px;
   font-weight: 700;
 }
+.student-number-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px;
+  border: 0;
+  border-radius: 10px;
+  color: #7b8b84;
+  background: transparent;
+  cursor: pointer;
+}
+.student-number-trigger > svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.student-number-trigger:hover,
+.student-number-trigger:focus-visible {
+  background: #f4f8f6;
+  outline: 2px solid #9ad2b9;
+  outline-offset: 1px;
+}
+.student-number-trigger:hover > svg,
+.student-number-trigger:focus-visible > svg {
+  opacity: 1;
+}
+.student-number-editor {
+  display: inline-grid;
+  grid-template-columns: 52px 28px 28px;
+  align-items: center;
+  gap: 4px;
+}
+.student-number-editor input {
+  width: 52px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid #58ad86;
+  border-radius: 8px;
+  color: #1f684e;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  outline: 2px solid rgba(88, 173, 134, 0.16);
+}
+.student-number-editor input[aria-invalid="true"] {
+  border-color: #d65b65;
+  outline-color: rgba(214, 91, 101, 0.14);
+}
+.student-number-editor button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: #7b8b84;
+  background: #f3f6f4;
+  cursor: pointer;
+}
+.student-number-editor button.save {
+  color: #fff;
+  background: #2f9a6d;
+}
+.student-number-editor button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.student-number-editor button svg {
+  width: 14px;
+  height: 14px;
+}
 .table-avatar.large {
   width: 48px;
   height: 48px;

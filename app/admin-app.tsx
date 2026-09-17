@@ -8,6 +8,7 @@ import {
   Bot,
   BrainCircuit,
   Building2,
+  Check,
   ChevronDown,
   ChevronUp,
   CircleHelp,
@@ -20,6 +21,7 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
+  LoaderCircle,
   Menu,
   NotebookPen,
   Plus,
@@ -1697,6 +1699,32 @@ export function AdminApp() {
     }
   };
 
+  const updateStudentNumber = async (
+    student: Student,
+    studentNumber: number | null,
+  ) => {
+    if (!token || !studentClassroomId) return;
+    try {
+      const updated = await api<Student>(
+        `/academic/students/${student.id}`,
+        {
+          ...jsonBody({
+            classroomId: studentClassroomId,
+            studentNumber,
+          }),
+          method: "PATCH",
+        },
+        token,
+      );
+      setStudents((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+    } catch (error) {
+      await showError(error);
+      throw error;
+    }
+  };
+
   const deleteClassroom = async (room: Classroom) => {
     if (!token) return;
     const answer = await Swal.fire({
@@ -3121,6 +3149,7 @@ export function AdminApp() {
                 setEditingStudent(student);
                 setModal("student");
               }}
+              onUpdateNumber={updateStudentNumber}
               onDelete={deleteStudent}
             />
           )}
@@ -3730,6 +3759,7 @@ function StudentsView({
   onStatusFilterChange,
   onPageChange,
   onEdit,
+  onUpdateNumber,
   onDelete,
 }: {
   rows: Student[];
@@ -3741,10 +3771,57 @@ function StudentsView({
   onStatusFilterChange: (status: string) => void;
   onPageChange: (page: number) => void;
   onEdit: (student: Student) => void;
+  onUpdateNumber: (
+    student: Student,
+    studentNumber: number | null,
+  ) => Promise<void>;
   onDelete: (student: Student) => void;
 }) {
   const [sortKey, setSortKey] = useState<StudentSortKey>("number");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [editingNumberStudentId, setEditingNumberStudentId] = useState<
+    string | null
+  >(null);
+  const [studentNumberDraft, setStudentNumberDraft] = useState("");
+  const [savingNumberStudentId, setSavingNumberStudentId] = useState<
+    string | null
+  >(null);
+  const [studentNumberError, setStudentNumberError] = useState("");
+  const startNumberEdit = (student: Student) => {
+    setEditingNumberStudentId(student.id);
+    setStudentNumberDraft(
+      String(studentNumberInClassroom(student, selectedClassroomId) ?? ""),
+    );
+    setStudentNumberError("");
+  };
+  const cancelNumberEdit = () => {
+    if (savingNumberStudentId) return;
+    setEditingNumberStudentId(null);
+    setStudentNumberDraft("");
+    setStudentNumberError("");
+  };
+  const saveStudentNumber = async (student: Student) => {
+    const trimmed = studentNumberDraft.trim();
+    const nextNumber = trimmed === "" ? null : Number(trimmed);
+    if (
+      nextNumber !== null &&
+      (!Number.isInteger(nextNumber) || nextNumber < 1 || nextNumber > 9999)
+    ) {
+      setStudentNumberError("กรอกเลข 1–9999");
+      return;
+    }
+    setSavingNumberStudentId(student.id);
+    setStudentNumberError("");
+    try {
+      await onUpdateNumber(student, nextNumber);
+      setEditingNumberStudentId(null);
+      setStudentNumberDraft("");
+    } catch {
+      // The parent displays the API error and keeps the editor open for retry.
+    } finally {
+      setSavingNumberStudentId(null);
+    }
+  };
   const sortedRows = useMemo(() => {
     const collator = new Intl.Collator("th-TH", {
       numeric: true,
@@ -3903,12 +3980,72 @@ function StudentsView({
                   pageRows.map((student) => (
                     <tr key={student.id}>
                       <td>
-                        <span className="student-number-chip">
-                          {studentNumberInClassroom(
-                            student,
-                            selectedClassroomId,
-                          ) ?? "—"}
-                        </span>
+                        {editingNumberStudentId === student.id ? (
+                          <form
+                            className="student-number-editor"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void saveStudentNumber(student);
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min={1}
+                              max={9999}
+                              value={studentNumberDraft}
+                              onChange={(event) => {
+                                setStudentNumberDraft(event.target.value);
+                                setStudentNumberError("");
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") cancelNumberEdit();
+                              }}
+                              aria-label={`แก้ไขเลขที่ของ ${student.user.firstName} ${student.user.lastName}`}
+                              aria-invalid={!!studentNumberError}
+                              title={studentNumberError || undefined}
+                              autoFocus
+                              disabled={savingNumberStudentId === student.id}
+                            />
+                            <button
+                              type="submit"
+                              className="save"
+                              aria-label="บันทึกเลขที่"
+                              title="บันทึก"
+                              disabled={savingNumberStudentId === student.id}
+                            >
+                              {savingNumberStudentId === student.id ? (
+                                <LoaderCircle className="spin" />
+                              ) : (
+                                <Check />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="ยกเลิกการแก้ไขเลขที่"
+                              title="ยกเลิก"
+                              onClick={cancelNumberEdit}
+                              disabled={savingNumberStudentId === student.id}
+                            >
+                              <X />
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            className="student-number-trigger"
+                            onClick={() => startNumberEdit(student)}
+                            aria-label={`แก้ไขเลขที่ของ ${student.user.firstName} ${student.user.lastName}`}
+                            title="คลิกเพื่อแก้ไขเลขที่"
+                          >
+                            <span className="student-number-chip">
+                              {studentNumberInClassroom(
+                                student,
+                                selectedClassroomId,
+                              ) ?? "—"}
+                            </span>
+                            <PencilLine />
+                          </button>
+                        )}
                       </td>
                       <td>
                         <span className="code-chip">{student.studentCode}</span>
