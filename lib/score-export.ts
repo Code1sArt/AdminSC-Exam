@@ -7,6 +7,7 @@ type ScoreItem = {
 
 type ScoreStudent = {
   id: string;
+  studentNumber?: number | null;
   studentCode: string;
   name: string;
   examScore: number;
@@ -197,6 +198,20 @@ const percentage = (score: number, maxScore: number) =>
 const scoreColumnKey = (subjectId: string, resultId: string) =>
   `${subjectId}:${resultId}`;
 
+const compareScoreStudents = (left: ScoreStudent, right: ScoreStudent) => {
+  if (left.studentNumber == null && right.studentNumber == null) {
+    return left.studentCode.localeCompare(right.studentCode, "th", {
+      numeric: true,
+    });
+  }
+  if (left.studentNumber == null) return 1;
+  if (right.studentNumber == null) return -1;
+  return (
+    left.studentNumber - right.studentNumber ||
+    left.studentCode.localeCompare(right.studentCode, "th", { numeric: true })
+  );
+};
+
 export function createScoreWorkbook(
   data: ScoreExportData,
   filters: ScoreExportFilters = {},
@@ -262,6 +277,7 @@ export function createScoreWorkbook(
       "ปีการศึกษา",
       "รหัสวิชา",
       "รายวิชา",
+      "เลขที่",
       "รหัสนักเรียน",
       "ชื่อ-นามสกุล",
       ...assignmentColumns.map(
@@ -281,6 +297,7 @@ export function createScoreWorkbook(
       "ห้องเรียน",
       "รหัสวิชา",
       "รายวิชา",
+      "เลขที่",
       "รหัสนักเรียน",
       "ชื่อ-นามสกุล",
       "รายงาน / งาน",
@@ -294,6 +311,7 @@ export function createScoreWorkbook(
       "ห้องเรียน",
       "รหัสวิชา",
       "รายวิชา",
+      "เลขที่",
       "รหัสนักเรียน",
       "ชื่อ-นามสกุล",
       "ข้อสอบ",
@@ -304,7 +322,7 @@ export function createScoreWorkbook(
   ];
 
   selected.forEach(({ classroom, subject, students }) => {
-    students.forEach((student) => {
+    [...students].sort(compareScoreStudents).forEach((student) => {
       const assignmentScores = new Map(
         student.assignmentResults.map((result) => [
           scoreColumnKey(subject.id, result.id),
@@ -323,6 +341,7 @@ export function createScoreWorkbook(
         classroom.academicYear,
         subject.code,
         subject.name,
+        student.studentNumber ?? "",
         student.studentCode,
         student.name,
         ...assignmentColumns.map(
@@ -341,6 +360,7 @@ export function createScoreWorkbook(
           classroom.name,
           subject.code,
           subject.name,
+          student.studentNumber ?? "",
           student.studentCode,
           student.name,
           result.title,
@@ -354,6 +374,7 @@ export function createScoreWorkbook(
           classroom.name,
           subject.code,
           subject.name,
+          student.studentNumber ?? "",
           student.studentCode,
           student.name,
           result.title,

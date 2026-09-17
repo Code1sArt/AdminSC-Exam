@@ -278,6 +278,7 @@ interface AcademicRecords {
       subject: { id: string; code: string; name: string };
       students: Array<{
         id: string;
+        studentNumber?: number | null;
         studentCode: string;
         name: string;
         examScore: number;
