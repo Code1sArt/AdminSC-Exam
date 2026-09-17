@@ -1525,6 +1525,83 @@ td span {
   color: #7569cb;
   font-size: 10px;
 }
+.score-export-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-color: #dfe5f0;
+  background: linear-gradient(135deg, #ffffff 0%, #f7f8ff 100%);
+}
+.score-export-heading,
+.score-export-controls {
+  display: flex;
+  align-items: center;
+}
+.score-export-heading {
+  min-width: 280px;
+  gap: 12px;
+}
+.score-export-heading strong,
+.score-export-heading span {
+  display: block;
+}
+.score-export-heading strong {
+  color: #344154;
+  font-size: 15px;
+}
+.score-export-heading > div > span {
+  margin-top: 3px;
+  color: #768196;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.score-export-icon {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  color: #2b815d;
+  background: #e8f7ef;
+}
+.score-export-icon svg {
+  width: 21px;
+}
+.score-export-controls {
+  justify-content: flex-end;
+  gap: 10px;
+}
+.score-export-controls label {
+  display: grid;
+  gap: 5px;
+  color: #687489;
+  font-size: 13px;
+  font-weight: 600;
+}
+.score-export-controls select {
+  min-width: 155px;
+  height: 40px;
+  padding: 0 34px 0 11px;
+  border: 1px solid #dfe3eb;
+  border-radius: 9px;
+  outline: 0;
+  color: #3e4a5e;
+  background: #fff;
+  font: inherit;
+  font-weight: 400;
+}
+.score-export-controls select:focus {
+  border-color: #a99ff4;
+  box-shadow: 0 0 0 3px #f1efff;
+}
+.score-export-button {
+  align-self: end;
+  min-height: 40px;
+  white-space: nowrap;
+}
 .assignment-card > summary {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -3294,6 +3371,19 @@ td span {
   .login-copy h1 {
     font-size: 31px;
   }
+  .score-export-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .score-export-controls {
+    justify-content: stretch;
+  }
+  .score-export-controls label {
+    flex: 1;
+  }
+  .score-export-controls select {
+    width: 100%;
+  }
 }
 @media (max-width: 760px) {
   .sidebar {
@@ -3333,6 +3423,15 @@ td span {
   }
   .content-actions {
     flex-wrap: wrap;
+  }
+  .grade-scale-bar,
+  .score-export-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .score-export-button {
+    align-self: stretch;
+    justify-content: center;
   }
   .search-box {
     width: 100%;

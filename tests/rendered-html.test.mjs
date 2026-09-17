@@ -25,10 +25,11 @@ test("server-renders Lab EDU admin panel metadata", async () => {
 });
 
 test("includes authenticated admin workflows and API integration", async () => {
-  const [app, apiClient, packageJson] = await Promise.all([
+  const [app, apiClient, packageJson, scoreExport] = await Promise.all([
     readFile(new URL("../app/admin-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../lib/score-export.ts", import.meta.url), "utf8"),
   ]);
   assert.match(app, /ภาพรวมระบบ/);
   assert.match(app, /จัดการนักเรียน/);
@@ -88,6 +89,13 @@ test("includes authenticated admin workflows and API integration", async () => {
   assert.match(app, /รีเซ็ตคะแนน/);
   assert.match(app, /onResetScore\(assignment, submission\)/);
   assert.match(app, /ยังไม่ส่งในระบบ/);
+  assert.match(app, /Export คะแนนเป็น Excel/);
+  assert.match(app, /api<AcademicRecords>\("\/records"/);
+  assert.match(app, /downloadScoreWorkbook/);
+  assert.match(scoreExport, /"สรุปคะแนน"/);
+  assert.match(scoreExport, /"คะแนนรายงาน"/);
+  assert.match(scoreExport, /"คะแนนสอบ"/);
+  assert.match(scoreExport, /spreadsheetml\.sheet/);
   assert.match(app, /รวมถึงคะแนนและผลประเมินที่ตรวจไว้จะถูกลบถาวร/);
   assert.doesNotMatch(app, /showConfirmButton: !assignment\._count\.submissions/);
   assert.match(app, /ยังไม่ได้เพิ่ม API Key/);

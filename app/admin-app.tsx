@@ -14,6 +14,7 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   FileQuestion,
+  FileSpreadsheet,
   Eye,
   GraduationCap,
   LayoutDashboard,
@@ -48,6 +49,7 @@ import {
 } from "react";
 import Swal from "sweetalert2";
 import { ApiError, api, jsonBody } from "../lib/api";
+import { downloadScoreWorkbook } from "../lib/score-export";
 import { PlaygroundProblemsView } from "./components/playground-problems-view";
 import { CodingTestsView } from "./components/coding-tests-view";
 
@@ -1165,8 +1167,14 @@ export function AdminApp() {
           setClassrooms(classRows);
           setSubjects(subjectRows);
         } else if (target === "assignments") {
-          const [assignmentRows, classRows, subjectRows, scale, statusData] =
-            await Promise.all([
+          const [
+            assignmentRows,
+            classRows,
+            subjectRows,
+            scale,
+            statusData,
+            records,
+          ] = await Promise.all([
               api<Assignment[]>("/assignments", {}, token),
               api<Classroom[]>("/academic/classrooms", {}, token),
               api<Subject[]>("/academic/subjects", {}, token),
@@ -1176,12 +1184,14 @@ export function AdminApp() {
                 token,
               ),
               api<AiStatusData>("/ai/status", {}, token),
+              api<AcademicRecords>("/records", {}, token),
             ]);
           setAssignments(assignmentRows);
           setClassrooms(classRows);
           setSubjects(subjectRows);
           setGradeScale(scale);
           setAiStatus(statusData);
+          setAcademicRecords(records);
         } else if (target === "results") {
           const examRows = await api<Exam[]>("/exams", {}, token);
           setExams(examRows);
@@ -3176,6 +3186,7 @@ export function AdminApp() {
             <AssignmentsView
               rows={assignments}
               gradeScale={gradeScale}
+              records={academicRecords}
               onEdit={(assignment) => {
                 setEditingAssignment(assignment);
                 setModal("assignment");
@@ -4708,6 +4719,7 @@ function ExamsView({
 function AssignmentsView({
   rows,
   gradeScale,
+  records,
   onEdit,
   onDelete,
   onStatus,
@@ -4720,6 +4732,7 @@ function AssignmentsView({
 }: {
   rows: Assignment[];
   gradeScale: Record<string, number>;
+  records: AcademicRecords | null;
   onEdit: (row: Assignment) => void;
   onDelete: (row: Assignment) => void;
   onStatus: (row: Assignment) => void;
@@ -4741,6 +4754,8 @@ function AssignmentsView({
   const [type, setType] = useState("ALL");
   const [subjectId, setSubjectId] = useState("ALL");
   const [classroomId, setClassroomId] = useState("ALL");
+  const [exportClassroomId, setExportClassroomId] = useState("ALL");
+  const [exportSubjectId, setExportSubjectId] = useState("ALL");
   const [page, setPage] = useState(1);
   const perPage = 6;
   const date = (value: string) =>
@@ -4765,6 +4780,30 @@ function AssignmentsView({
         ).entries(),
       ),
     [rows],
+  );
+  const exportClassrooms = records?.classrooms ?? [];
+  const exportSubjects = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          (records?.classrooms ?? [])
+            .filter(
+              ({ classroom }) =>
+                exportClassroomId === "ALL" ||
+                classroom.id === exportClassroomId,
+            )
+            .flatMap(({ subjects: subjectRows }) =>
+              subjectRows.map(
+                ({ subject }) =>
+                  [
+                    subject.id,
+                    `${subject.name} (${subject.code})`,
+                  ] as const,
+              ),
+            ),
+        ).entries(),
+      ),
+    [exportClassroomId, records],
   );
   const filteredRows = useMemo(() => {
     const keyword = search.trim().toLocaleLowerCase("th-TH");
@@ -4793,6 +4832,38 @@ function AssignmentsView({
     setSubjectId("ALL");
     setClassroomId("ALL");
   };
+  const exportScores = () => {
+    if (!records) return;
+    const classroom = exportClassrooms.find(
+      ({ classroom: item }) => item.id === exportClassroomId,
+    )?.classroom;
+    const subjectLabel = exportSubjects.find(
+      ([id]) => id === exportSubjectId,
+    )?.[1];
+    try {
+      downloadScoreWorkbook(
+        records,
+        {
+          classroomId:
+            exportClassroomId === "ALL" ? undefined : exportClassroomId,
+          subjectId: exportSubjectId === "ALL" ? undefined : exportSubjectId,
+        },
+        {
+          classroom: classroom?.name ?? "ทุกห้องเรียน",
+          subject: subjectLabel ?? "ทุกวิชา",
+        },
+      );
+      void Swal.fire({
+        icon: "success",
+        title: "ส่งออกคะแนนเรียบร้อย",
+        text: "ไฟล์ Excel แยกชีตคะแนนรายงานและคะแนนสอบแล้ว",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      void showError(error);
+    }
+  };
   return (
     <div className="assignment-layout">
       <section className="grade-scale-bar">
@@ -4809,6 +4880,62 @@ function AssignmentsView({
         >
           <PencilLine size={15} /> เกณฑ์เกรดรายวิชา
         </button>
+      </section>
+      <section className="panel score-export-panel">
+        <div className="score-export-heading">
+          <span className="score-export-icon">
+            <FileSpreadsheet />
+          </span>
+          <div>
+            <strong>Export คะแนนเป็น Excel</strong>
+            <span>
+              เลือกส่งออกรายห้อง รายวิชา หรือทั้งหมด · แยกชีตคะแนนรายงานและคะแนนสอบ
+            </span>
+          </div>
+        </div>
+        <div className="score-export-controls">
+          <label>
+            ห้องเรียน
+            <select
+              value={exportClassroomId}
+              onChange={(event) => {
+                setExportClassroomId(event.target.value);
+                setExportSubjectId("ALL");
+              }}
+              disabled={!records}
+            >
+              <option value="ALL">ทุกห้องเรียน</option>
+              {exportClassrooms.map(({ classroom }) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            รายวิชา
+            <select
+              value={exportSubjectId}
+              onChange={(event) => setExportSubjectId(event.target.value)}
+              disabled={!records}
+            >
+              <option value="ALL">ทุกวิชา</option>
+              {exportSubjects.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button primary score-export-button"
+            onClick={exportScores}
+            disabled={!records || !exportClassrooms.length}
+          >
+            <FileSpreadsheet size={17} /> Export คะแนน Excel
+          </button>
+        </div>
       </section>
       <section className="panel assignment-browser">
         <div className="assignment-browser-head">
