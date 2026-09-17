@@ -161,7 +161,10 @@ interface Student {
     lastName: string;
     isActive: boolean;
   };
-  enrollments: Array<{ classroom: { id: string; name: string } }>;
+  enrollments: Array<{
+    studentNumber?: number | null;
+    classroom: { id: string; name: string };
+  }>;
 }
 
 interface Teacher {
@@ -856,18 +859,25 @@ function questionImportExampleForType(type: string) {
 const studentImportExample = [
   [
     "student_code",
+    "student_number",
     "first_name",
     "last_name",
     "email",
     "password",
     "grade_level",
   ],
-  ["STU001", "สมชาย", "ใจดี", "stu001@example.com", "Student123!", "ม.1"],
-  ["STU002", "สมหญิง", "เรียนเก่ง", "stu002@example.com", "Student123!", "ม.1"],
+  ["STU001", "1", "สมชาย", "ใจดี", "stu001@example.com", "Student123!", "ม.1"],
+  ["STU002", "2", "สมหญิง", "เรียนเก่ง", "stu002@example.com", "Student123!", "ม.1"],
 ];
 const studentPageSize = 20;
 type StudentSortKey =
-  "code" | "name" | "grade" | "classroom" | "email" | "status";
+  | "number"
+  | "code"
+  | "name"
+  | "grade"
+  | "classroom"
+  | "email"
+  | "status";
 
 export function AdminApp() {
   const [token, setToken] = useState<string | null>(null);
@@ -1276,7 +1286,7 @@ export function AdminApp() {
         (!studentStatusFilter ||
           (studentStatusFilter === "ACTIVE") === student.user.isActive) &&
         (!keyword ||
-          `${student.studentCode} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
+          `${student.studentCode} ${student.enrollments.find((item) => item.classroom.id === studentClassroomId)?.studentNumber ?? ""} ${student.user.firstName} ${student.user.lastName} ${student.user.email}`
             .toLocaleLowerCase("th-TH")
             .includes(keyword)),
     );
@@ -1347,6 +1357,11 @@ export function AdminApp() {
               email: data.get("email"),
               password: data.get("password") || undefined,
               studentCode: data.get("studentCode"),
+              studentNumber: data.get("studentNumber")
+                ? Number(data.get("studentNumber"))
+                : editingStudent
+                  ? null
+                  : undefined,
               gradeLevel: data.get("gradeLevel") || undefined,
               classroomId:
                 data.get("classroomId") || (editingStudent ? null : undefined),
@@ -3281,6 +3296,7 @@ export function AdminApp() {
           editingAssignment={editingAssignment}
           editingExam={editingExam}
           editingOrganization={editingOrganization}
+          selectedStudentClassroomId={studentClassroomId}
           aiStatus={aiStatus}
           onClose={() => {
             setModal(null);
@@ -3696,6 +3712,14 @@ function DashboardView({
   );
 }
 
+const studentNumberInClassroom = (
+  student: Student,
+  classroomId: string,
+) =>
+  student.enrollments.find(
+    (enrollment) => enrollment.classroom.id === classroomId,
+  )?.studentNumber ?? null;
+
 function StudentsView({
   rows,
   classrooms,
@@ -3719,13 +3743,34 @@ function StudentsView({
   onEdit: (student: Student) => void;
   onDelete: (student: Student) => void;
 }) {
-  const [sortKey, setSortKey] = useState<StudentSortKey>("code");
+  const [sortKey, setSortKey] = useState<StudentSortKey>("number");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const sortedRows = useMemo(() => {
     const collator = new Intl.Collator("th-TH", {
       numeric: true,
       sensitivity: "base",
     });
+    const direction = sortDirection === "asc" ? 1 : -1;
+    if (sortKey === "number") {
+      return [...rows].sort((left, right) => {
+        const leftNumber = studentNumberInClassroom(
+          left,
+          selectedClassroomId,
+        );
+        const rightNumber = studentNumberInClassroom(
+          right,
+          selectedClassroomId,
+        );
+        if (leftNumber == null && rightNumber == null)
+          return collator.compare(left.studentCode, right.studentCode);
+        if (leftNumber == null) return 1;
+        if (rightNumber == null) return -1;
+        return (
+          (leftNumber - rightNumber) * direction ||
+          collator.compare(left.studentCode, right.studentCode)
+        );
+      });
+    }
     const valueFor = (student: Student) => {
       switch (sortKey) {
         case "name":
@@ -3746,10 +3791,9 @@ function StudentsView({
     };
     return [...rows].sort(
       (left, right) =>
-        collator.compare(valueFor(left), valueFor(right)) *
-        (sortDirection === "asc" ? 1 : -1),
+        collator.compare(valueFor(left), valueFor(right)) * direction,
     );
-  }, [rows, sortDirection, sortKey]);
+  }, [rows, selectedClassroomId, sortDirection, sortKey]);
   const changeSort = (key: StudentSortKey) => {
     if (key === sortKey) {
       setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
@@ -3844,6 +3888,7 @@ function StudentsView({
             <table>
               <thead>
                 <tr>
+                  {sortableHeader("เลขที่", "number")}
                   {sortableHeader("รหัส", "code")}
                   {sortableHeader("ชื่อ–นามสกุล", "name")}
                   {sortableHeader("ระดับชั้น", "grade")}
@@ -3857,6 +3902,14 @@ function StudentsView({
                 {pageRows.length ? (
                   pageRows.map((student) => (
                     <tr key={student.id}>
+                      <td>
+                        <span className="student-number-chip">
+                          {studentNumberInClassroom(
+                            student,
+                            selectedClassroomId,
+                          ) ?? "—"}
+                        </span>
+                      </td>
                       <td>
                         <span className="code-chip">{student.studentCode}</span>
                       </td>
@@ -3900,7 +3953,7 @@ function StudentsView({
                     </tr>
                   ))
                 ) : (
-                  <TableEmpty colSpan={7} />
+                  <TableEmpty colSpan={8} />
                 )}
               </tbody>
             </table>
@@ -7948,6 +8001,7 @@ function DataModal({
   editingAssignment,
   editingExam,
   editingOrganization,
+  selectedStudentClassroomId,
   aiStatus,
   onClose,
   onSubmit,
@@ -7966,6 +8020,7 @@ function DataModal({
   editingAssignment: Assignment | null;
   editingExam: Exam | null;
   editingOrganization: Organization | null;
+  selectedStudentClassroomId: string;
   aiStatus: AiStatusData | null;
   onClose: () => void;
   onSubmit: (data: FormData) => void;
@@ -8137,30 +8192,51 @@ function DataModal({
                   <>
                     <div className="field-row">
                       <Field
+                        label="เลขที่นักเรียน"
+                        name="studentNumber"
+                        type="number"
+                        min={1}
+                        max={9999}
+                        placeholder="เช่น 1"
+                        defaultValue={
+                          editingStudent?.enrollments.find(
+                            (item) =>
+                              item.classroom.id === selectedStudentClassroomId,
+                          )?.studentNumber ?? ""
+                        }
+                      />
+                      <Field
                         label="รหัสนักเรียน"
                         name="studentCode"
                         defaultValue={editingStudent?.studentCode}
                         required
                       />
+                    </div>
+                    <div className="field-row">
                       <Field
                         label="ระดับชั้น"
                         name="gradeLevel"
                         placeholder="เช่น ม.1"
                         defaultValue={editingStudent?.gradeLevel}
                       />
+                      <SelectField
+                        label="ห้องเรียน"
+                        name="classroomId"
+                        options={classrooms.map((room) => ({
+                          value: room.id,
+                          label: room.name,
+                        }))}
+                        optional={!isTeacher || !!editingStudent}
+                        defaultValue={
+                          editingStudent?.enrollments.find(
+                            (item) =>
+                              item.classroom.id === selectedStudentClassroomId,
+                          )?.classroom.id ??
+                          editingStudent?.enrollments[0]?.classroom.id ??
+                          selectedStudentClassroomId
+                        }
+                      />
                     </div>
-                    <SelectField
-                      label="ห้องเรียน"
-                      name="classroomId"
-                      options={classrooms.map((room) => ({
-                        value: room.id,
-                        label: room.name,
-                      }))}
-                      optional={!isTeacher || !!editingStudent}
-                      defaultValue={
-                        editingStudent?.enrollments[0]?.classroom.id
-                      }
-                    />
                   </>
                 )}
               </>

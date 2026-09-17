@@ -837,6 +837,19 @@ td span {
   font-size: 9px !important;
   font-weight: 700;
 }
+.student-number-chip {
+  display: inline-grid;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  place-items: center;
+  border: 1px solid #d8e9df;
+  border-radius: 9px;
+  color: #277454;
+  background: #eef9f3;
+  font-size: 13px;
+  font-weight: 700;
+}
 .table-avatar.large {
   width: 48px;
   height: 48px;

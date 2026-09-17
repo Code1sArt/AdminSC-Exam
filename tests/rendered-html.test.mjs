@@ -33,6 +33,9 @@ test("includes authenticated admin workflows and API integration", async () => {
   ]);
   assert.match(app, /ภาพรวมระบบ/);
   assert.match(app, /จัดการนักเรียน/);
+  assert.match(app, /เลขที่นักเรียน/);
+  assert.match(app, /studentNumber/);
+  assert.match(app, /sortableHeader\("เลขที่", "number"\)/);
   assert.match(app, /สร้างข้อสอบด้วย AI/);
   assert.match(app, /\/auth\/login/);
   assert.match(app, /currentProfile\.role\.toUpperCase\(\) === "STUDENT"/);
