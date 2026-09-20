@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(headers = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request("http://localhost/", { headers: { accept: "text/html", ...headers } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -22,6 +22,17 @@ test("server-renders Lab EDU admin panel metadata", async () => {
   assert.match(html, /<title>Lab EDU — ผู้ดูแลระบบ<\/title>/i);
   assert.match(html, /กำลังเตรียมระบบ/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
+});
+
+test("renders metadata when proxies append forwarded protocol values", async () => {
+  const response = await render({
+    host: "admin.labedu.tech",
+    "x-forwarded-host": "admin.labedu.tech, admin.labedu.tech",
+    "x-forwarded-proto": "https, https",
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /https:\/\/admin\.labedu\.tech\/og\.png/);
 });
 
 test("includes authenticated admin workflows and API integration", async () => {

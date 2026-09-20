@@ -8,8 +8,13 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:5173";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const host = (requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:5173")
+    .split(",")[0]
+    .trim();
+  const forwardedProtocol = requestHeaders.get("x-forwarded-proto")?.split(",")[0].trim();
+  const protocol = forwardedProtocol === "http" || forwardedProtocol === "https"
+    ? forwardedProtocol
+    : host.startsWith("localhost") ? "http" : "https";
   const origin = `${protocol}://${host}`;
   return {
     metadataBase: new URL(origin),
