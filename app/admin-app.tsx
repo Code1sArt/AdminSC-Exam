@@ -308,6 +308,25 @@ interface AcademicRecords {
   }>;
 }
 
+interface AssignmentStudent {
+  id: string;
+  studentNumber?: number | null;
+  studentCode: string;
+  user: { firstName: string; lastName: string };
+}
+
+const compareAssignmentStudents = (
+  left: AssignmentStudent,
+  right: AssignmentStudent,
+) => {
+  if (left.studentNumber == null && right.studentNumber != null) return 1;
+  if (left.studentNumber != null && right.studentNumber == null) return -1;
+  return (
+    (left.studentNumber ?? 0) - (right.studentNumber ?? 0) ||
+    left.studentCode.localeCompare(right.studentCode, "th-TH", { numeric: true })
+  );
+};
+
 interface AssignmentSubmission {
   id: string;
   content?: string | null;
@@ -326,17 +345,9 @@ interface AssignmentSubmission {
     role: string;
     score?: string | number | null;
     feedback?: string | null;
-    student: {
-      id: string;
-      studentCode: string;
-      user: { firstName: string; lastName: string };
-    };
+    student: AssignmentStudent;
   }>;
-  student: {
-    id: string;
-    studentCode: string;
-    user: { firstName: string; lastName: string };
-  };
+  student: AssignmentStudent;
 }
 
 interface Assignment {
@@ -357,11 +368,7 @@ interface Assignment {
   maxGroupSize: number;
   classroom: { id: string; name: string };
   subject: { id: string; name: string };
-  students: Array<{
-    id: string;
-    studentCode: string;
-    user: { firstName: string; lastName: string };
-  }>;
+  students: AssignmentStudent[];
   submissions: AssignmentSubmission[];
   _count: { submissions: number };
 }
@@ -1182,6 +1189,7 @@ export function AdminApp() {
         } else if (target === "assignments") {
           const [
             assignmentRows,
+            studentRows,
             classRows,
             subjectRows,
             scale,
@@ -1189,6 +1197,7 @@ export function AdminApp() {
             records,
           ] = await Promise.all([
               api<Assignment[]>("/assignments", {}, token),
+              api<Student[]>("/academic/students", {}, token),
               api<Classroom[]>("/academic/classrooms", {}, token),
               api<Subject[]>("/academic/subjects", {}, token),
               api<Record<string, number>>(
@@ -1199,7 +1208,40 @@ export function AdminApp() {
               api<AiStatusData>("/ai/status", {}, token),
               api<AcademicRecords>("/records", {}, token),
             ]);
-          setAssignments(assignmentRows);
+          const studentById = new Map(
+            studentRows.map((student) => [student.id, student]),
+          );
+          setAssignments(
+            assignmentRows.map((assignment) => {
+              const withStudentNumber = (student: AssignmentStudent) => {
+                const profile = studentById.get(student.id);
+                return {
+                  ...student,
+                  studentNumber: profile
+                    ? studentNumberInClassroom(profile, assignment.classroom.id)
+                    : student.studentNumber ?? null,
+                };
+              };
+              return {
+                ...assignment,
+                students: assignment.students
+                  .map(withStudentNumber)
+                  .sort(compareAssignmentStudents),
+                submissions: assignment.submissions.map((submission) => ({
+                  ...submission,
+                  student: withStudentNumber(submission.student),
+                  members: submission.members
+                    ?.map((member) => ({
+                      ...member,
+                      student: withStudentNumber(member.student),
+                    }))
+                    .sort((left, right) =>
+                      compareAssignmentStudents(left.student, right.student),
+                    ),
+                })),
+              };
+            }),
+          );
           setClassrooms(classRows);
           setSubjects(subjectRows);
           setGradeScale(scale);
@@ -2045,7 +2087,7 @@ export function AdminApp() {
     const memberFields = (submission.members ?? [])
       .map(
         (member) =>
-          `<label class="swal-member-score"><span><b>${escapeHtml(member.student.user.firstName)} ${escapeHtml(member.student.user.lastName)}</b><small>${escapeHtml(member.role)}</small></span><input data-member-score="${escapeHtml(member.studentId)}" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" value="${Number(member.score ?? 0)}"></label>`,
+          `<label class="swal-member-score"><span><b>${escapeHtml(member.student.user.firstName)} ${escapeHtml(member.student.user.lastName)}</b><small>เลขที่ ${member.student.studentNumber ?? "—"} · ${escapeHtml(member.role)}</small></span><input data-member-score="${escapeHtml(member.studentId)}" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" value="${Number(member.score ?? 0)}"></label>`,
       )
       .join("");
     const result = await Swal.fire({
@@ -2202,12 +2244,12 @@ export function AdminApp() {
         const submission = submissionByStudent.get(student.id);
         const hasScore =
           submission?.score !== null && submission?.score !== undefined;
-        return `<label class="swal-class-score${student.id === selectedStudentId ? " is-selected" : ""}"><span><b>${escapeHtml(student.user.firstName)} ${escapeHtml(student.user.lastName)}</b><small>${escapeHtml(student.studentCode)} · ${submission?.content || submission?.attachmentUrl || submission?.attachmentUrls?.length ? "ส่งในระบบแล้ว" : hasScore ? "ครูบันทึกคะแนนแล้ว" : "ยังไม่ส่งในระบบ"}</small></span><input data-class-score="${escapeHtml(student.id)}" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" value="${hasScore ? Number(submission.score) : ""}" placeholder="—"></label>`;
+        return `<label class="swal-class-score${student.id === selectedStudentId ? " is-selected" : ""}"><span><b>${escapeHtml(student.user.firstName)} ${escapeHtml(student.user.lastName)}</b><small>เลขที่ ${student.studentNumber ?? "—"} · ${escapeHtml(student.studentCode)} · ${submission?.content || submission?.attachmentUrl || submission?.attachmentUrls?.length ? "ส่งในระบบแล้ว" : hasScore ? "ครูบันทึกคะแนนแล้ว" : "ยังไม่ส่งในระบบ"}</small></span><input data-class-score="${escapeHtml(student.id)}" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" value="${hasScore ? Number(submission.score) : ""}" placeholder="—"></label>`;
       })
       .join("");
     const result = await Swal.fire({
       title: `ให้คะแนนทั้งห้อง · ${assignment.classroom.name}`,
-      html: `<p class="swal-class-grade-note">กรอกคะแนนได้ทันทีแม้นักเรียนส่งงานนอกระบบหรือยังไม่มีรายการส่งงาน</p><div class="swal-fill-all"><input id="classroom-shared-score" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" placeholder="คะแนนเต็ม ${Number(assignment.maxScore)}"><button id="fill-classroom-scores" type="button">ใส่คะแนนนี้ทุกคน</button></div><input id="classroom-student-search" class="swal-class-search" type="search" placeholder="ค้นหาชื่อนักเรียน หรือรหัสนักเรียน"><div class="swal-class-scores">${studentFields}</div><label class="swal-field">ความคิดเห็นเดียวกัน (เว้นว่างได้)<textarea id="classroom-feedback" rows="3"></textarea></label>`,
+      html: `<p class="swal-class-grade-note">กรอกคะแนนได้ทันทีแม้นักเรียนส่งงานนอกระบบหรือยังไม่มีรายการส่งงาน</p><div class="swal-fill-all"><input id="classroom-shared-score" type="number" min="0" max="${Number(assignment.maxScore)}" step="0.01" placeholder="คะแนนเต็ม ${Number(assignment.maxScore)}"><button id="fill-classroom-scores" type="button">ใส่คะแนนนี้ทุกคน</button></div><input id="classroom-student-search" class="swal-class-search" type="search" placeholder="ค้นหาเลขที่ ชื่อนักเรียน หรือรหัสนักเรียน"><div class="swal-class-scores">${studentFields}</div><label class="swal-field">ความคิดเห็นเดียวกัน (เว้นว่างได้)<textarea id="classroom-feedback" rows="3"></textarea></label>`,
       width: 680,
       showCancelButton: true,
       confirmButtonText: "บันทึกคะแนน",
@@ -5296,6 +5338,7 @@ function AssignmentsView({
                 <table>
                   <thead>
                     <tr>
+                      {!assignment.isGroupWork && <th>เลขที่</th>}
                       <th>นักเรียน</th>
                       <th>ส่งเมื่อ</th>
                       <th>งานที่ส่ง</th>
@@ -5317,6 +5360,7 @@ function AssignmentsView({
                                   </strong>
                                   {(submission.members ?? []).map((member) => (
                                     <span key={member.studentId}>
+                                      เลขที่ {member.student.studentNumber ?? "—"} ·{" "}
                                       {member.student.user.firstName}{" "}
                                       {member.student.user.lastName} ·{" "}
                                       {member.role}
@@ -5379,6 +5423,7 @@ function AssignmentsView({
                                   <b>คะแนนรายคน</b>
                                   {(submission.members ?? []).map((member) => (
                                     <span key={member.studentId}>
+                                      เลขที่ {member.student.studentNumber ?? "—"} ·{" "}
                                       {member.student.user.firstName}:{" "}
                                       {member.score == null
                                         ? "-"
@@ -5459,6 +5504,7 @@ function AssignmentsView({
                         );
                         return (
                           <tr key={student.id}>
+                            <td>{student.studentNumber ?? "—"}</td>
                             <td>
                               <strong>
                                 {student.user.firstName} {student.user.lastName}
@@ -5571,7 +5617,7 @@ function AssignmentsView({
                         );
                       })
                     ) : (
-                      <TableEmpty colSpan={5} />
+                      <TableEmpty colSpan={6} />
                     )}
                   </tbody>
                 </table>
