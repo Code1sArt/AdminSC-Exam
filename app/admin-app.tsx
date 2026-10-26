@@ -1129,7 +1129,10 @@ export function AdminApp() {
         } else if (target === "teachers") {
           setTeachers(await api<Teacher[]>("/academic/teachers", {}, token));
         } else if (target === "classrooms") {
-          if (currentProfile.role === "ADMIN") {
+          if (
+            currentProfile.role === "ADMIN" ||
+            currentProfile.role === "SUPER_ADMIN"
+          ) {
             const [classRows, teacherRows] = await Promise.all([
               api<Classroom[]>("/academic/classrooms", {}, token),
               api<Teacher[]>("/academic/teachers", {}, token),
