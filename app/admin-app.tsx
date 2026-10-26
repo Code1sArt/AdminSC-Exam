@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  Database,
   Bot,
   BrainCircuit,
   Building2,
@@ -74,6 +75,7 @@ type PageKey =
   | "organizations"
   | "ai-models"
   | "ai-usage"
+  | "data-reset"
   | "settings";
 type ModalKind =
   | "student"
@@ -638,6 +640,12 @@ const navigation: Array<{
         icon: Settings,
         roles: ["ADMIN", "TEACHER"],
       },
+      {
+        key: "data-reset",
+        label: "ล้างข้อมูล",
+        icon: Database,
+        roles: ["ADMIN"],
+      },
     ],
   },
 ];
@@ -702,6 +710,10 @@ const pageTitles: Record<PageKey, { title: string; subtitle: string }> = {
   "ai-usage": {
     title: "การใช้งาน AI",
     subtitle: "ติดตาม token คงเหลือและค่าใช้จ่ายรายเดือน",
+  },
+  "data-reset": {
+    title: "ล้างข้อมูล",
+    subtitle: "ลบข้อมูลในองค์กรอย่างระมัดระวังและตรวจสอบผลก่อนยืนยัน",
   },
   settings: {
     title: "ตั้งค่าระบบ",
@@ -2998,6 +3010,63 @@ export function AdminApp() {
     }
   };
 
+  const resetOrganizationData = async (resource: string) => {
+    if (!token) return;
+    const labels: Record<string, string> = {
+      students: "นักเรียนและผลที่ผูกกับบัญชีนักเรียน",
+      classrooms: "ห้องเรียน พร้อมข้อสอบ งาน และ Coding Test ในองค์กร",
+      exams: "ชุดข้อสอบ ผลสอบ และประวัติการรีเซ็ตผลสอบ",
+      questions: "คลังข้อสอบ รวมชุดข้อสอบและผลสอบที่เกี่ยวข้อง",
+      assignments: "งาน การส่งงาน และคะแนน",
+      "coding-tests": "Coding Test คำตอบ และผลตรวจ",
+      subjects: "วิชา ตัวชี้วัด และข้อมูลการวัดผลที่เกี่ยวข้อง",
+      playground: "โจทย์ Playground",
+      "ai-usage": "ประวัติคำขอ AI ขององค์กร",
+      all: "ข้อมูลการเรียนการสอนทั้งหมดขององค์กร",
+    };
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "ยืนยันการล้างข้อมูล",
+      html: `<p>กำลังจะลบ<strong> ${escapeHtml(labels[resource] ?? "ข้อมูลที่เลือก")}</strong> แบบถาวร</p><p>การดำเนินการนี้ย้อนกลับไม่ได้ บัญชีผู้ดูแล ครู และการตั้งค่าองค์กรจะยังอยู่</p>`,
+      input: "text",
+      inputLabel: 'พิมพ์ “ยืนยันล้างข้อมูล” เพื่อดำเนินการ',
+      inputPlaceholder: "ยืนยันล้างข้อมูล",
+      showCancelButton: true,
+      confirmButtonText: "ลบข้อมูลถาวร",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#c2413a",
+      inputValidator: (value) =>
+        value !== "ยืนยันล้างข้อมูล" ? "ข้อความยืนยันไม่ถูกต้อง" : undefined,
+    });
+    if (!result.isConfirmed) return;
+    setLoading(true);
+    try {
+      const response = await api<{ resource: string; deleted: Record<string, number> }>(
+        "/platform/data-reset",
+        {
+          ...jsonBody({ resource, confirmation: result.value }),
+          method: "POST",
+        },
+        token,
+      );
+      const deletedCount = Object.values(response.deleted).reduce(
+        (sum, count) => sum + count,
+        0,
+      );
+      await Swal.fire({
+        icon: "success",
+        title: "ล้างข้อมูลเรียบร้อย",
+        text: `ลบข้อมูลทั้งหมด ${deletedCount.toLocaleString("th-TH")} รายการ`,
+        confirmButtonText: "ตกลง",
+      });
+      await loadPage("data-reset", true);
+    } catch (error) {
+      await showError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!hydrated)
     return (
       <div className="app-loader">
@@ -3337,6 +3406,9 @@ export function AdminApp() {
           )}
           {!loading && page === "ai-usage" && (
             <AiUsageView data={aiUsage} onEditBudget={updateAiBudget} />
+          )}
+          {!loading && page === "data-reset" && (
+            <DataResetView onReset={resetOrganizationData} />
           )}
           {!loading && page === "settings" && (
             <SettingsView
@@ -9329,6 +9401,53 @@ function ConnectionBadge({
     <span className={`connection-status connection-${mode.toLowerCase()}`}>
       {label[mode]}
     </span>
+  );
+}
+function DataResetView({ onReset }: { onReset: (resource: string) => void }) {
+  const actions = [
+    { id: "students", title: "นักเรียน", detail: "บัญชีนักเรียน ประวัติผลสอบ คะแนนงาน และการเข้าเรียน" },
+    { id: "classrooms", title: "ห้องเรียน", detail: "ห้องเรียน พร้อมชุดข้อสอบ งาน และ Coding Test ที่สังกัดองค์กร" },
+    { id: "exams", title: "ชุดข้อสอบและผลสอบ", detail: "ชุดข้อสอบ คำตอบ คะแนน และประวัติการรีเซ็ตผลสอบ" },
+    { id: "questions", title: "คลังข้อสอบ", detail: "คลังข้อสอบ รวมชุดข้อสอบและผลสอบที่อ้างอิงข้อสอบ" },
+    { id: "assignments", title: "งานและคะแนน", detail: "งาน การส่งงาน ไฟล์แนบ และคะแนนที่บันทึกไว้" },
+    { id: "coding-tests", title: "Coding Test", detail: "ชุดทดสอบ คำตอบ source code และผลตรวจ" },
+    { id: "subjects", title: "วิชาและตัวชี้วัด", detail: "วิชา ตัวชี้วัด และข้อมูลการวัดผลที่เกี่ยวข้อง" },
+    { id: "playground", title: "โจทย์ Playground", detail: "โจทย์ฝึกเขียนโปรแกรมทั้งหมดในองค์กร" },
+    { id: "ai-usage", title: "ประวัติการใช้ AI", detail: "ประวัติคำขอและ token ของ AI ในองค์กร" },
+  ];
+  return (
+    <div className="data-reset-page">
+      <section className="data-reset-notice">
+        <ShieldAlert size={22} />
+        <div>
+          <strong>การลบข้อมูลไม่สามารถย้อนกลับได้</strong>
+          <p>ข้อมูลจะถูกลบเฉพาะองค์กรที่บัญชีนี้สังกัด บัญชีผู้ดูแลและครู รวมถึงการตั้งค่าองค์กรจะคงอยู่</p>
+        </div>
+      </section>
+      <section className="data-reset-grid">
+        {actions.map((action) => (
+          <article className="panel data-reset-card" key={action.id}>
+            <div className="data-reset-card-copy">
+              <h3>{action.title}</h3>
+              <p>{action.detail}</p>
+            </div>
+            <button className="button secondary data-reset-button" onClick={() => onReset(action.id)}>
+              <Trash2 size={15} /> ล้างข้อมูล
+            </button>
+          </article>
+        ))}
+      </section>
+      <section className="data-reset-all">
+        <div>
+          <h3>ล้างข้อมูลทั้งหมด</h3>
+          <p>ล้างข้อมูลการเรียนการสอน นักเรียน ห้องเรียน วิชา ข้อสอบ งาน Coding Test โจทย์ Playground และประวัติ AI ทั้งหมดในองค์กร</p>
+          <small>บัญชีผู้ดูแล ครู และการตั้งค่าองค์กรจะยังอยู่</small>
+        </div>
+        <button className="button danger" onClick={() => onReset("all")}>
+          <Trash2 size={16} /> ล้างข้อมูลทั้งหมด
+        </button>
+      </section>
+    </div>
   );
 }
 function DifficultyBadge({ value }: { value: string }) {
